@@ -291,3 +291,4 @@ CORS_ALLOWED_ORIGINS = [
 ## License
 
 Proprietary - Glancewise
+# glance-mobile
