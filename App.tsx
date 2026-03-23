@@ -16,6 +16,7 @@ import ProcessingQueueScreen from './src/screens/ProcessingQueueScreen';
 import DocumentDetailScreen from './src/screens/DocumentDetailScreen';
 import UploadDocumentScreen from './src/screens/UploadDocumentScreen';
 import ThemeSettingsScreen from './src/screens/ThemeSettingsScreen';
+import NotificationsScreen from './src/screens/NotificationsScreen';
 import { ThemeProvider, useTheme } from './src/theme';
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -81,9 +82,10 @@ function AppNavigator() {
           <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
           <Stack.Screen name="CompanySelection" component={CompanySelectionScreen} options={{ headerShown: false }} />
           <Stack.Screen name="ProcessingQueue" component={ProcessingQueueScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ headerShown: false }} />
           <Stack.Screen name="ThemeSettings" component={ThemeSettingsScreen} options={{ headerShown: false }} />
           <Stack.Screen name="UploadDocument" component={UploadDocumentScreen} options={{ headerShown: false }} />
-          <Stack.Screen name="DocumentDetail" component={DocumentDetailScreen} options={{ title: 'Document Details' }} />
+          <Stack.Screen name="DocumentDetail" component={DocumentDetailScreen} options={{ headerShown: false }} />
         </Stack.Navigator>
       </NavigationContainer>
       <StatusBar barStyle={resolvedTheme === 'dark' ? 'light-content' : 'dark-content'} />

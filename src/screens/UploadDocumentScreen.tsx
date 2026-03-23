@@ -15,6 +15,7 @@ import {
   Platform,
   Pressable,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import type { UploadDocumentScreenProps } from '../types/navigation';
@@ -252,7 +253,13 @@ export default function UploadDocumentScreen({ navigation }: UploadDocumentScree
   return (
     <SafeAreaView style={styles.flex} edges={['top']}>
       <View style={styles.header}>
-        <AppButton label="Back" variant="outline" onPress={() => navigation.goBack()} style={styles.backButton} />
+        <TouchableOpacity
+          style={styles.backIconButton}
+          onPress={() => navigation.goBack()}
+          activeOpacity={0.9}
+        >
+          <Ionicons name="arrow-back" size={20} color={theme.colors.textPrimary} />
+        </TouchableOpacity>
         <Text style={styles.title}>Upload Document</Text>
       </View>
       <KeyboardAvoidingView
@@ -458,9 +465,16 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
       borderBottomWidth: 1,
       borderBottomColor: theme.colors.border,
     },
-    backButton: {
+    backIconButton: {
+      width: theme.button.height,
+      height: theme.button.height,
+      borderRadius: theme.button.radius,
+      borderWidth: 1,
+      borderColor: theme.colors.borderStrong,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.surface,
       marginRight: theme.spacing[3],
-      minWidth: 84,
     },
     title: {
       fontSize: theme.typography.size.lg,

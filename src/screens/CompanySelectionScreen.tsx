@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CompanySelectionScreenProps } from '../types/navigation';
 import companyService, { TenantWorkspace } from '../services/company.service';
@@ -107,7 +108,13 @@ export default function CompanySelectionScreen({ navigation }: CompanySelectionS
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           {navigation.canGoBack() ? (
-            <AppButton label="Back" variant="outline" onPress={() => navigation.goBack()} style={styles.backButton} />
+            <TouchableOpacity
+              style={styles.backIconButton}
+              onPress={() => navigation.goBack()}
+              activeOpacity={0.9}
+            >
+              <Ionicons name="arrow-back" size={20} color={theme.colors.textPrimary} />
+            </TouchableOpacity>
           ) : (
             <View style={styles.backPlaceholder} />
           )}
@@ -165,12 +172,19 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
     alignItems: 'flex-end',
     justifyContent: 'center',
   },
-  backButton: {
-    minWidth: 84,
+  backIconButton: {
+    width: theme.button.height,
+    height: theme.button.height,
+    borderRadius: theme.button.radius,
+    borderWidth: 1,
+    borderColor: theme.colors.borderStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.surface,
   },
   backPlaceholder: {
-    width: 1,
-    height: 1,
+    width: theme.button.height,
+    height: theme.button.height,
   },
   title: {
     flex: 1,

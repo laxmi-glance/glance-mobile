@@ -303,7 +303,7 @@ export default function ProcessingQueueScreen({ navigation }: ProcessingQueueScr
         companyName={companyName}
         userLabel={username || 'User'}
         onChangeTenant={handleChangeCompany}
-        onNotificationPress={() => Alert.alert('Notifications', 'No new notifications.')}
+        onNotificationPress={() => navigation.navigate('Notifications')}
         onProfilePress={() => undefined}
         onOpenThemeSettings={() => navigation.navigate('ThemeSettings')}
         onLogout={handleLogout}

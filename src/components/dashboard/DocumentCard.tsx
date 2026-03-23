@@ -113,6 +113,7 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
   actionRow: {
     marginTop: theme.spacing[3],
     flexDirection: 'row',
+    justifyContent: 'flex-end',
   },
   actionBtn: {
     minHeight: theme.button.height,
@@ -120,7 +121,7 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
     borderWidth: 1,
     paddingHorizontal: theme.spacing[3],
     justifyContent: 'center',
-    marginRight: theme.spacing[3],
+    marginLeft: theme.spacing[3],
   },
   actionBtnDisabled: {
     opacity: 0.5,
