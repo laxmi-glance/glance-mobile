@@ -299,7 +299,7 @@ export default function ProcessingQueueScreen({ navigation }: ProcessingQueueScr
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <DashboardHeader
-        title={companyName ? `Active Company: ${companyName}` : 'Active Company'}
+        title={companyName || 'Active Company'}
         companyName={companyName}
         userLabel={username || 'User'}
         onChangeTenant={handleChangeCompany}

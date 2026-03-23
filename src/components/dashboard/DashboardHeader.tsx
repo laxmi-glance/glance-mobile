@@ -24,15 +24,9 @@ export default function DashboardHeader({
   onLogout,
   onOpenThemeSettings,
 }: DashboardHeaderProps) {
-  const { theme, resolvedTheme } = useTheme();
+  const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const logoSource = useMemo(
-    () =>
-      resolvedTheme === 'dark'
-        ? require('../../assets/img/glancewise-logo.png')
-        : require('../../assets/img/glancewise-logo-dark.png'),
-    [resolvedTheme]
-  );
+  const logoSource = require('../../../assets/favicon.png');
   const initial = userLabel.trim().charAt(0).toUpperCase() || 'U';
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
@@ -63,7 +57,12 @@ export default function DashboardHeader({
         </View>
       </View>
 
-      <Text style={styles.title}>{title}</Text>
+      <View style={styles.titleRow}>
+        <Ionicons name="business-outline" size={18} color={theme.colors.textMuted} />
+        <Text style={styles.title} numberOfLines={1}>
+          {title}
+        </Text>
+      </View>
 
       {profileMenuOpen ? (
         <>
@@ -122,8 +121,8 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
       marginRight: theme.spacing[3],
     },
     brandLogo: {
-      width: 170,
-      height: 34,
+      width: 28,
+      height: 28,
     },
     actions: {
       flexDirection: 'row',
@@ -156,12 +155,18 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
       fontWeight: theme.typography.weight.bold,
       fontFamily: theme.typography.fontFamilyPrimary,
     },
-    title: {
+    titleRow: {
       marginTop: theme.spacing[3],
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    title: {
+      marginLeft: theme.spacing[2],
       fontSize: theme.typography.size.lg,
       fontWeight: theme.typography.weight.semibold,
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamilyPrimary,
+      flex: 1,
     },
     menuBackdrop: {
       ...StyleSheet.absoluteFillObject,

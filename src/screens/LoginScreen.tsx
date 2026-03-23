@@ -7,6 +7,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native';
 import { LoginScreenProps } from '../types/navigation';
 import authService from '../services/auth.service';
@@ -16,6 +17,7 @@ import AppButton from '../components/common/AppButton';
 export default function LoginScreen({ navigation }: LoginScreenProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const logoSource = require('../../assets/favicon.png');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -47,7 +49,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
       style={styles.container}
     >
       <View style={styles.content}>
-        <Text style={styles.title}>Glancewise</Text>
+        <Image source={logoSource} style={styles.logo} resizeMode="contain" />
         <Text style={styles.subtitle}>Sign in to continue</Text>
 
         <View style={styles.form}>
@@ -95,15 +97,14 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
   content: {
     flex: 1,
     justifyContent: 'center',
+    alignItems: 'center',
     paddingHorizontal: theme.spacing[6],
   },
-  title: {
-    fontSize: theme.typography.size['2xl'],
-    fontWeight: theme.typography.weight.bold,
-    color: theme.colors.textPrimary,
-    marginBottom: theme.spacing[2],
-    textAlign: 'center',
-    fontFamily: theme.typography.fontFamilyPrimary,
+  logo: {
+    width: 64,
+    height: 64,
+    alignSelf: 'center',
+    marginBottom: theme.spacing[12],
   },
   subtitle: {
     fontSize: theme.typography.size.body,
@@ -114,6 +115,8 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
   },
   form: {
     width: '100%',
+    maxWidth: 420,
+    alignSelf: 'center',
   },
   input: {
     backgroundColor: theme.colors.surface,
