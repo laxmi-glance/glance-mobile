@@ -1,8 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { StatusBar } from 'expo-status-bar';
-import { ActivityIndicator, View, StyleSheet } from 'react-native';
+import { createStackNavigator } from '@react-navigation/stack';
+import { ActivityIndicator, View, StyleSheet, StatusBar } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { RootStackParamList } from './src/types/navigation';
 import authService from './src/services/auth.service';
@@ -16,12 +15,30 @@ import CompanySelectionScreen from './src/screens/CompanySelectionScreen';
 import ProcessingQueueScreen from './src/screens/ProcessingQueueScreen';
 import DocumentDetailScreen from './src/screens/DocumentDetailScreen';
 import UploadDocumentScreen from './src/screens/UploadDocumentScreen';
+import { ThemeProvider, useTheme } from './src/theme';
 
-const Stack = createNativeStackNavigator<RootStackParamList>();
+const Stack = createStackNavigator<RootStackParamList>();
 
-export default function App() {
+function AppNavigator() {
+  const { theme, resolvedTheme } = useTheme();
   const [isLoading, setIsLoading] = useState(true);
   const [initialRoute, setInitialRoute] = useState<keyof RootStackParamList>('Login');
+
+  const screenOptions = useMemo(
+    () => ({
+      headerStyle: {
+        backgroundColor: theme.colors.surface,
+      },
+      headerTintColor: theme.colors.textPrimary,
+      headerTitleStyle: {
+        fontFamily: theme.typography.fontFamilyPrimary,
+        fontWeight: theme.typography.weight.bold,
+      },
+      headerShadowVisible: false,
+      headerBackTitleVisible: false,
+    }),
+    [theme]
+  );
 
   useEffect(() => {
     checkAuthStatus();
@@ -50,55 +67,34 @@ export default function App() {
 
   if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
+      <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
+        <ActivityIndicator size="large" color={theme.colors.primaryAccent} />
       </View>
     );
   }
 
   return (
-    <SafeAreaProvider>
+    <>
       <NavigationContainer ref={navigationRef} onReady={onNavigationReady}>
-        <Stack.Navigator
-          initialRouteName={initialRoute}
-          screenOptions={{
-            headerStyle: {
-              backgroundColor: '#007AFF',
-            },
-            headerTintColor: '#fff',
-            headerTitleStyle: {
-              fontWeight: 'bold',
-            },
-          }}
-        >
-          <Stack.Screen
-            name="Login"
-            component={LoginScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="CompanySelection"
-            component={CompanySelectionScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="ProcessingQueue"
-            component={ProcessingQueueScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="UploadDocument"
-            component={UploadDocumentScreen}
-            options={{ title: 'Upload document' }}
-          />
-          <Stack.Screen
-            name="DocumentDetail"
-            component={DocumentDetailScreen}
-            options={{ title: 'Document Details' }}
-          />
+        <Stack.Navigator initialRouteName={initialRoute} detachInactiveScreens={false} screenOptions={screenOptions}>
+          <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="CompanySelection" component={CompanySelectionScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="ProcessingQueue" component={ProcessingQueueScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="UploadDocument" component={UploadDocumentScreen} options={{ title: 'Upload Document' }} />
+          <Stack.Screen name="DocumentDetail" component={DocumentDetailScreen} options={{ title: 'Document Details' }} />
         </Stack.Navigator>
       </NavigationContainer>
-      <StatusBar style="auto" />
+      <StatusBar barStyle={resolvedTheme === 'dark' ? 'light-content' : 'dark-content'} />
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <AppNavigator />
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
@@ -108,6 +104,5 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
   },
 });

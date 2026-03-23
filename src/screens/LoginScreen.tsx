@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -12,8 +12,11 @@ import {
 } from 'react-native';
 import { LoginScreenProps } from '../types/navigation';
 import authService from '../services/auth.service';
+import { useTheme } from '../theme';
 
 export default function LoginScreen({ navigation }: LoginScreenProps) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -52,6 +55,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
           <TextInput
             style={styles.input}
             placeholder="Username or email"
+            placeholderTextColor={theme.colors.textMuted}
             value={username}
             onChangeText={setUsername}
             autoCapitalize="none"
@@ -62,6 +66,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
           <TextInput
             style={styles.input}
             placeholder="Password"
+            placeholderTextColor={theme.colors.textMuted}
             value={password}
             onChangeText={setPassword}
             secureTextEntry
@@ -74,7 +79,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
             disabled={loading}
           >
             {loading ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={theme.colors.onPrimary} />
             ) : (
               <Text style={styles.buttonText}>Sign In</Text>
             )}
@@ -85,55 +90,61 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
+const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
+  StyleSheet.create({
+    container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.surfaceMuted,
   },
   content: {
     flex: 1,
     justifyContent: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: theme.spacing[6],
   },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
+    fontSize: theme.typography.size['3xl'],
+    fontWeight: theme.typography.weight.bold,
+    color: theme.colors.textPrimary,
+    marginBottom: theme.spacing[2],
     textAlign: 'center',
+    fontFamily: theme.typography.fontFamilyPrimary,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 48,
+    fontSize: theme.typography.size.body,
+    color: theme.colors.textMuted,
+    marginBottom: theme.spacing[12],
     textAlign: 'center',
+    fontFamily: theme.typography.fontFamilyPrimary,
   },
   form: {
     width: '100%',
   },
   input: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    marginBottom: 16,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: theme.spacing[4],
+    paddingVertical: theme.spacing[3],
+    fontSize: theme.typography.size.body,
+    marginBottom: theme.spacing[4],
+    color: theme.colors.textPrimary,
+    fontFamily: theme.typography.fontFamilyPrimary,
   },
   button: {
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
-    paddingVertical: 14,
+    backgroundColor: theme.colors.primaryAccent,
+    borderRadius: theme.radius.sm,
+    paddingVertical: theme.spacing[3] + 2,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: theme.spacing[2],
   },
   buttonDisabled: {
     opacity: 0.6,
   },
   buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    color: theme.colors.onPrimary,
+    fontSize: theme.typography.size.body,
+    fontWeight: theme.typography.weight.semibold,
+    fontFamily: theme.typography.fontFamilyPrimary,
   },
-});
+  });

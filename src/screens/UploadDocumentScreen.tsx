@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -20,10 +20,13 @@ import type { UploadDocumentScreenProps } from '../types/navigation';
 import documentService from '../services/document.service';
 import { DOCUMENT_TYPE_OPTIONS, type DocumentTypeValue, labelForDocumentType } from '../constants/documentTypes';
 import { MAX_UPLOAD_BYTES, prepareImageForUpload } from '../utils/prepareImageForUpload';
+import { useTheme } from '../theme';
 
 const SOFT_SIZE_BYTES = 5 * 1024 * 1024;
 
 export default function UploadDocumentScreen({ navigation }: UploadDocumentScreenProps) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const [preparedUri, setPreparedUri] = useState<string | null>(null);
   const [sizeBytes, setSizeBytes] = useState<number>(0);
   const [documentType, setDocumentType] = useState<DocumentTypeValue>('purchase_invoice');
@@ -210,7 +213,7 @@ export default function UploadDocumentScreen({ navigation }: UploadDocumentScree
 
         {preparing ? (
           <View style={styles.centerPad}>
-            <ActivityIndicator size="large" color="#007AFF" />
+            <ActivityIndicator size="large" color={theme.colors.primaryAccent} />
             <Text style={styles.muted}>Optimizing image…</Text>
           </View>
         ) : null}
@@ -241,6 +244,7 @@ export default function UploadDocumentScreen({ navigation }: UploadDocumentScree
         <TextInput
           style={styles.notes}
           placeholder="Add context for approvers…"
+          placeholderTextColor={theme.colors.textMuted}
           value={notes}
           onChangeText={setNotes}
           multiline
@@ -256,7 +260,11 @@ export default function UploadDocumentScreen({ navigation }: UploadDocumentScree
           onPress={submit}
           disabled={!preparedUri || uploading}
         >
-          {uploading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Upload document</Text>}
+          {uploading ? (
+            <ActivityIndicator color={theme.colors.onPrimary} />
+          ) : (
+            <Text style={styles.primaryBtnText}>Upload document</Text>
+          )}
         </TouchableOpacity>
       </ScrollView>
 
@@ -277,104 +285,166 @@ export default function UploadDocumentScreen({ navigation }: UploadDocumentScree
   );
 }
 
-const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: '#f5f5f5' },
-  scroll: { padding: 16, paddingBottom: 32 },
-  hint: { fontSize: 14, color: '#666', marginBottom: 16, lineHeight: 20 },
-  actionsRow: { flexDirection: 'row', marginBottom: 16 },
+const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
+  StyleSheet.create({
+    flex: { flex: 1, backgroundColor: theme.colors.surfaceMuted },
+    scroll: { padding: theme.spacing[4], paddingBottom: theme.spacing[8] },
+    hint: {
+      fontSize: theme.typography.size.small,
+      color: theme.colors.textMuted,
+      marginBottom: theme.spacing[4],
+      lineHeight: 20,
+      fontFamily: theme.typography.fontFamilyPrimary,
+    },
+    actionsRow: { flexDirection: 'row', marginBottom: theme.spacing[4] },
   secondaryBtnSpacing: {
-    marginRight: 12,
+    marginRight: theme.spacing[3],
   },
   secondaryBtn: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
-    backgroundColor: '#fff',
+    paddingVertical: theme.spacing[3],
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
-    borderColor: '#007AFF',
+    borderColor: theme.colors.primaryAccent,
     alignItems: 'center',
   },
-  secondaryBtnText: { color: '#007AFF', fontWeight: '600', fontSize: 16 },
-  centerPad: { alignItems: 'center', paddingVertical: 16 },
-  muted: { marginTop: 8, color: '#888' },
-  previewBox: { marginBottom: 16, alignItems: 'center' },
+    secondaryBtnText: {
+      color: theme.colors.primaryAccent,
+      fontWeight: theme.typography.weight.semibold,
+      fontSize: theme.typography.size.body,
+      fontFamily: theme.typography.fontFamilyPrimary,
+    },
+    centerPad: { alignItems: 'center', paddingVertical: theme.spacing[4] },
+    muted: {
+      marginTop: theme.spacing[2],
+      color: theme.colors.textMuted,
+      fontFamily: theme.typography.fontFamilyPrimary,
+    },
+    previewBox: { marginBottom: theme.spacing[4], alignItems: 'center' },
   preview: {
     width: '100%',
     height: 220,
-    borderRadius: 12,
-    backgroundColor: '#e8e8e8',
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.surfaceElevated,
   },
-  meta: { marginTop: 8, fontSize: 13, color: '#666' },
-  clearLink: { marginTop: 6, color: '#FF3B30', fontSize: 15 },
-  label: { fontSize: 14, fontWeight: '600', color: '#333', marginBottom: 8 },
+    meta: {
+      marginTop: theme.spacing[2],
+      fontSize: theme.typography.size.sm,
+      color: theme.colors.textMuted,
+      fontFamily: theme.typography.fontFamilyPrimary,
+    },
+    clearLink: {
+      marginTop: theme.spacing[1] + 2,
+      color: theme.colors.error,
+      fontSize: theme.typography.size.md,
+      fontFamily: theme.typography.fontFamilyPrimary,
+    },
+    label: {
+      fontSize: theme.typography.size.small,
+      fontWeight: theme.typography.weight.semibold,
+      color: theme.colors.textPrimary,
+      marginBottom: theme.spacing[2],
+      fontFamily: theme.typography.fontFamilyPrimary,
+    },
   selectField: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    marginBottom: 16,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: theme.spacing[3] + 2,
+    paddingVertical: theme.spacing[3] + 2,
+    marginBottom: theme.spacing[4],
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: theme.colors.border,
   },
-  selectValue: { fontSize: 16, color: '#111', flex: 1 },
-  chevron: { fontSize: 12, color: '#888' },
+    selectValue: {
+      fontSize: theme.typography.size.body,
+      color: theme.colors.textPrimary,
+      flex: 1,
+      fontFamily: theme.typography.fontFamilyPrimary,
+    },
+    chevron: { fontSize: theme.typography.size.xs, color: theme.colors.textMuted },
   notes: {
     minHeight: 88,
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 20,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing[3],
+    marginBottom: theme.spacing[5],
     borderWidth: 1,
-    borderColor: '#ddd',
-    fontSize: 16,
+    borderColor: theme.colors.border,
+    fontSize: theme.typography.size.body,
+    color: theme.colors.textPrimary,
+    fontFamily: theme.typography.fontFamilyPrimary,
     ...Platform.select({
       android: { textAlignVertical: 'top' as const },
       default: {},
     }),
   },
-  progressText: { textAlign: 'center', marginBottom: 12, color: '#007AFF', fontWeight: '600' },
+    progressText: {
+      textAlign: 'center',
+      marginBottom: theme.spacing[3],
+      color: theme.colors.primaryAccent,
+      fontWeight: theme.typography.weight.semibold,
+      fontFamily: theme.typography.fontFamilyPrimary,
+    },
   primaryBtn: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 16,
-    borderRadius: 12,
+    backgroundColor: theme.colors.primaryAccent,
+    paddingVertical: theme.spacing[4],
+    borderRadius: theme.radius.lg,
     alignItems: 'center',
   },
   primaryBtnDisabled: { opacity: 0.45 },
-  primaryBtnText: { color: '#fff', fontSize: 17, fontWeight: '600' },
+    primaryBtnText: {
+      color: theme.colors.onPrimary,
+      fontSize: theme.typography.size.lg,
+      fontWeight: theme.typography.weight.semibold,
+      fontFamily: theme.typography.fontFamilyPrimary,
+    },
   modalRoot: {
     flex: 1,
     justifyContent: 'flex-end',
   },
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: theme.colors.overlay,
   },
   modalSheet: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    backgroundColor: theme.colors.surface,
+    borderTopLeftRadius: theme.radius.xl,
+    borderTopRightRadius: theme.radius.xl,
     maxHeight: '70%',
-    paddingBottom: 24,
+    paddingBottom: theme.spacing[6],
   },
   modalTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    padding: 16,
+    fontSize: theme.typography.size.lg,
+    fontWeight: theme.typography.weight.bold,
+    padding: theme.spacing[4],
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#ddd',
+    borderBottomColor: theme.colors.border,
+    color: theme.colors.textPrimary,
+    fontFamily: theme.typography.fontFamilyPrimary,
   },
   typeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: theme.spacing[4],
+    paddingVertical: theme.spacing[3] + 2,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#eee',
+    borderBottomColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
   },
-  typeRowText: { fontSize: 16, color: '#111' },
-  typeCheck: { fontSize: 18, color: '#007AFF', fontWeight: '700' },
-});
+    typeRowText: {
+      fontSize: theme.typography.size.body,
+      color: theme.colors.textPrimary,
+      fontFamily: theme.typography.fontFamilyPrimary,
+    },
+    typeCheck: {
+      fontSize: theme.typography.size.lg,
+      color: theme.colors.primaryAccent,
+      fontWeight: theme.typography.weight.bold,
+      fontFamily: theme.typography.fontFamilyPrimary,
+    },
+  });

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -9,16 +9,12 @@ import {
 } from 'react-native';
 import { DocumentDetailScreenProps } from '../types/navigation';
 import documentService from '../services/document.service';
-
-function getStatusColor(status: string): string {
-  const s = status.toLowerCase();
-  if (s === 'approved') return '#34C759';
-  if (s === 'rejected') return '#FF3B30';
-  if (s === 'pending') return '#FF9500';
-  return '#8E8E93';
-}
+import StatusBadge from '../components/dashboard/StatusBadge';
+import { useTheme } from '../theme';
 
 export default function DocumentDetailScreen({ route, navigation }: DocumentDetailScreenProps) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const { documentId } = route.params;
   const [detail, setDetail] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
@@ -50,7 +46,7 @@ export default function DocumentDetailScreen({ route, navigation }: DocumentDeta
   if (loading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color={theme.colors.primaryAccent} />
       </View>
     );
   }
@@ -67,9 +63,7 @@ export default function DocumentDetailScreen({ route, navigation }: DocumentDeta
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.fileName}>{fileName}</Text>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(approvalStatus) }]}>
-          <Text style={styles.statusText}>{approvalStatus.toUpperCase()}</Text>
-        </View>
+        <StatusBadge status={approvalStatus} />
       </View>
 
       <View style={styles.section}>
@@ -94,10 +88,11 @@ export default function DocumentDetailScreen({ route, navigation }: DocumentDeta
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
+const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
+  StyleSheet.create({
+    container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.surfaceMuted,
   },
   centerContainer: {
     flex: 1,
@@ -105,56 +100,49 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   header: {
-    backgroundColor: '#fff',
-    padding: 20,
+    backgroundColor: theme.colors.surface,
+    padding: theme.spacing[5],
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: theme.colors.border,
   },
   fileName: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 12,
-  },
-  statusBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  statusText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: theme.typography.size.xl,
+    fontWeight: theme.typography.weight.bold,
+    color: theme.colors.textPrimary,
+    marginBottom: theme.spacing[3],
+    fontFamily: theme.typography.fontFamilyPrimary,
   },
   section: {
-    backgroundColor: '#fff',
-    marginTop: 16,
-    padding: 20,
+    backgroundColor: theme.colors.surface,
+    marginTop: theme.spacing[4],
+    padding: theme.spacing[5],
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 16,
+    fontSize: theme.typography.size.lg,
+    fontWeight: theme.typography.weight.semibold,
+    color: theme.colors.textPrimary,
+    marginBottom: theme.spacing[4],
+    fontFamily: theme.typography.fontFamilyPrimary,
   },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 12,
+    paddingVertical: theme.spacing[3],
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: theme.colors.border,
   },
   label: {
-    fontSize: 15,
-    color: '#666',
+    fontSize: theme.typography.size.md,
+    color: theme.colors.textMuted,
+    fontFamily: theme.typography.fontFamilyPrimary,
   },
   value: {
-    fontSize: 15,
-    color: '#333',
-    fontWeight: '500',
+    fontSize: theme.typography.size.md,
+    color: theme.colors.textPrimary,
+    fontWeight: theme.typography.weight.medium,
     flex: 1,
     textAlign: 'right',
-    marginLeft: 12,
+    marginLeft: theme.spacing[3],
+    fontFamily: theme.typography.fontFamilyPrimary,
   },
-});
+  });

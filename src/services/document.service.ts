@@ -11,6 +11,8 @@ export interface DocumentListItem {
   created_on?: string;
   gl_posting_status?: string;
   invoice_number?: string | null;
+  created_by_username?: string | null;
+  document_type?: string | null;
 }
 
 export interface ProcessingQueueParams {
@@ -26,6 +28,14 @@ export interface ProcessingQueueResponse {
   next: string | null;
   previous: string | null;
   results: DocumentListItem[];
+}
+
+export interface DocumentStats {
+  total: number;
+  pending: number;
+  approved: number;
+  approved_pending_post: number;
+  rejected: number;
 }
 
 export interface UploadFinancialDocumentFields {
@@ -62,9 +72,25 @@ class DocumentService {
     return response.data;
   }
 
+  async getDocumentStats(): Promise<DocumentStats> {
+    const response = await apiClient.get<DocumentStats>('/financial-document/financial-documents/stats/');
+    return response.data;
+  }
+
   async getDocumentDetail(documentId: string): Promise<Record<string, unknown>> {
     const response = await apiClient.get<Record<string, unknown>>(
       `/financial-document/financial-document/${documentId}/`
+    );
+    return response.data;
+  }
+
+  async updateDocumentStatus(
+    documentId: string,
+    approvalStatus: 'approved' | 'rejected' | 'pending'
+  ): Promise<Record<string, unknown>> {
+    const response = await apiClient.patch<Record<string, unknown>>(
+      `/financial-document/financial-document/${documentId}/update-status/`,
+      { approval_status: approvalStatus }
     );
     return response.data;
   }

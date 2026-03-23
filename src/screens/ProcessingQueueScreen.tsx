@@ -1,50 +1,76 @@
-import React, { useState, useCallback } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
-  View,
-  Text,
-  FlatList,
-  StyleSheet,
-  ActivityIndicator,
-  RefreshControl,
-  TouchableOpacity,
   Alert,
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ProcessingQueueScreenProps } from '../types/navigation';
-import documentService, { DocumentListItem } from '../services/document.service';
+import authService from '../services/auth.service';
+import DashboardHeader from '../components/dashboard/DashboardHeader';
+import DocumentCard from '../components/dashboard/DocumentCard';
+import UploadFab from '../components/dashboard/UploadFab';
+import documentService, { DocumentListItem, DocumentStats } from '../services/document.service';
 import companyService from '../services/company.service';
+import { useTheme } from '../theme';
 
-function getRowStatus(item: DocumentListItem): string {
-  if (item.approval_status) {
-    return item.approval_status;
-  }
-  if (item.status) {
-    return 'processing';
-  }
+type DashboardTab = 'my_uploads' | 'pending_approval' | 'team_documents';
+
+const TABS: Array<{ key: DashboardTab; label: string }> = [
+  { key: 'my_uploads', label: 'My Uploads' },
+  { key: 'pending_approval', label: 'Pending Approval' },
+  { key: 'team_documents', label: 'Team Documents' },
+];
+
+function resolveStatus(item: DocumentListItem): string {
+  if (item.approval_status) return String(item.approval_status).toLowerCase();
+  if (item.status) return 'processing';
   return 'pending';
 }
 
-function getStatusColor(status: string): string {
-  const s = status.toLowerCase();
-  if (s === 'approved') return '#34C759';
-  if (s === 'rejected') return '#FF3B30';
-  if (s === 'processing') return '#007AFF';
-  if (s === 'pending') return '#FF9500';
-  return '#8E8E93';
+function formatDate(dateString?: string): string {
+  if (!dateString) return '—';
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return String(dateString);
+  return (
+    date.toLocaleDateString() +
+    ' ' +
+    date.toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  );
 }
 
 export default function ProcessingQueueScreen({ navigation }: ProcessingQueueScreenProps) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const [documents, setDocuments] = useState<DocumentListItem[]>([]);
+  const [stats, setStats] = useState<DocumentStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [companyName, setCompanyName] = useState('');
+  const [username, setUsername] = useState('');
+  const [activeTab, setActiveTab] = useState<DashboardTab>('my_uploads');
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const requestTokenRef = useRef(0);
 
-  const loadDocuments = useCallback(async (pageNum: number = 1) => {
+  const loadDocuments = useCallback(async (pageNum = 1) => {
+    const requestToken = ++requestTokenRef.current;
     try {
       const response = await documentService.getProcessingQueue({ page: pageNum });
+      if (requestToken !== requestTokenRef.current) {
+        return;
+      }
 
       if (pageNum === 1) {
         setDocuments(response.results);
@@ -55,30 +81,67 @@ export default function ProcessingQueueScreen({ navigation }: ProcessingQueueScr
       setHasMore(!!response.next);
       setPage(pageNum);
     } catch {
+      if (requestToken !== requestTokenRef.current) {
+        return;
+      }
       Alert.alert('Error', 'Failed to load documents. Please try again.');
     } finally {
+      if (requestToken !== requestTokenRef.current) {
+        return;
+      }
       setLoading(false);
       setRefreshing(false);
       setLoadingMore(false);
     }
   }, []);
 
+  const loadStats = useCallback(async () => {
+    try {
+      const summary = await documentService.getDocumentStats();
+      setStats(summary);
+    } catch {
+      // Non-blocking
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
+      let isActive = true;
       (async () => {
-        const company = await companyService.getSelectedCompany();
-        if (company) {
+        try {
+          const [company, user] = await Promise.all([companyService.getSelectedCompany(), authService.getCurrentUser()]);
+          if (!isActive) {
+            return;
+          }
+          if (!company) {
+            navigation.replace('CompanySelection');
+            return;
+          }
           setCompanyName(company.company_name || 'Workspace');
+          setUsername(String(user?.username || user?.email || '').trim());
+          await Promise.all([loadDocuments(1), loadStats()]);
+        } catch {
+          if (!isActive) {
+            return;
+          }
+          Alert.alert('Error', 'Could not load dashboard.');
+          setLoading(false);
+          setRefreshing(false);
+          setLoadingMore(false);
         }
-        await loadDocuments(1);
       })();
-    }, [loadDocuments])
+
+      return () => {
+        isActive = false;
+        requestTokenRef.current += 1;
+      };
+    }, [loadDocuments, loadStats, navigation])
   );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    loadDocuments(1);
-  }, [loadDocuments]);
+    Promise.all([loadDocuments(1), loadStats()]);
+  }, [loadDocuments, loadStats]);
 
   const loadMore = () => {
     if (!loadingMore && hasMore && !loading) {
@@ -87,18 +150,19 @@ export default function ProcessingQueueScreen({ navigation }: ProcessingQueueScr
     }
   };
 
-  const formatDate = (dateString: string | undefined) => {
-    if (!dateString) return '—';
-    const date = new Date(dateString);
-    return (
-      date.toLocaleDateString() +
-      ' ' +
-      date.toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    );
-  };
+  const filteredDocuments = useMemo(() => {
+    const normalizedUsername = username.toLowerCase();
+    return documents.filter((item) => {
+      const status = resolveStatus(item);
+      const creator = String(item.created_by_username || '').toLowerCase();
+      const isMine = normalizedUsername ? creator === normalizedUsername : false;
+
+      if (activeTab === 'pending_approval') return status === 'pending';
+      if (activeTab === 'team_documents') return !!creator && !isMine;
+      if (!creator) return true;
+      return isMine;
+    });
+  }, [activeTab, documents, username]);
 
   const openDocument = (item: DocumentListItem) => {
     if (item.approval_status == null && item.status) {
@@ -108,21 +172,54 @@ export default function ProcessingQueueScreen({ navigation }: ProcessingQueueScr
     navigation.navigate('DocumentDetail', { documentId: item.id });
   };
 
-  const renderDocumentItem = ({ item }: { item: DocumentListItem }) => {
-    const status = getRowStatus(item);
-    return (
-      <TouchableOpacity style={styles.documentCard} onPress={() => openDocument(item)}>
-        <View style={styles.documentHeader}>
-          <Text style={styles.fileName} numberOfLines={1}>
-            {item.file_name || item.invoice_number || 'Document'}
-          </Text>
-          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(status) }]}>
-            <Text style={styles.statusText}>{status.toUpperCase()}</Text>
-          </View>
-        </View>
+  const updateApproval = async (item: DocumentListItem, target: 'approved' | 'rejected') => {
+    setActionLoadingId(item.id);
+    try {
+      await documentService.updateDocumentStatus(item.id, target);
+      await Promise.all([loadDocuments(1), loadStats()]);
+    } catch (error: unknown) {
+      const detail =
+        (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
+        `Failed to mark as ${target}.`;
+      Alert.alert('Action failed', String(detail));
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
 
-        <Text style={styles.dateText}>Created: {formatDate(item.created_on)}</Text>
-      </TouchableOpacity>
+  const handleApprove = (item: DocumentListItem) => {
+    updateApproval(item, 'approved');
+  };
+
+  const handleReject = (item: DocumentListItem) => {
+    Alert.alert('Reject document?', 'This will mark the document as rejected.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Reject', style: 'destructive', onPress: () => updateApproval(item, 'rejected') },
+    ]);
+  };
+
+  const emptyMessage = useMemo(() => {
+    if (activeTab === 'pending_approval') return 'No approvals pending right now.';
+    if (activeTab === 'team_documents') return 'No team documents to show yet.';
+    return 'No uploads yet. Start by uploading a document.';
+  }, [activeTab]);
+
+  const renderDocumentItem = ({ item }: { item: DocumentListItem }) => {
+    const status = resolveStatus(item);
+    const title = item.file_name || item.invoice_number || 'Document';
+    const showActions = activeTab === 'pending_approval' && status === 'pending';
+
+    return (
+      <DocumentCard
+        title={title}
+        createdAtLabel={formatDate(item.created_on)}
+        status={status}
+        onPress={() => openDocument(item)}
+        showApprovalActions={showActions}
+        onApprove={() => handleApprove(item)}
+        onReject={() => handleReject(item)}
+        actionLoading={actionLoadingId === item.id}
+      />
     );
   };
 
@@ -131,162 +228,183 @@ export default function ProcessingQueueScreen({ navigation }: ProcessingQueueScr
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.headerTitleBlock}>
-          <Text style={styles.title}>Documents</Text>
-          <Text style={styles.companyText}>{companyName}</Text>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <DashboardHeader
+        title="Documents"
+        companyName={companyName}
+        userLabel={username || 'User'}
+        onChangeTenant={handleChangeCompany}
+        onNotificationPress={() => Alert.alert('Notifications', 'No new notifications.')}
+        onProfilePress={() => Alert.alert('Profile', username || 'User profile')}
+      />
+
+      <View style={styles.summaryCards}>
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryLabel}>Pending Approvals</Text>
+          <Text style={styles.summaryValue}>{stats?.pending ?? 0}</Text>
         </View>
-        <View style={styles.headerActions}>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('UploadDocument')}
-            style={styles.uploadButton}
-          >
-            <Text style={styles.uploadButtonText}>Upload</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleChangeCompany} style={styles.changeButton}>
-            <Text style={styles.changeButtonText}>Change</Text>
-          </TouchableOpacity>
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryLabel}>Uploaded by Me</Text>
+          <Text style={styles.summaryValue}>{documents.filter((d) => (d.created_by_username || '').toLowerCase() === username.toLowerCase()).length}</Text>
+        </View>
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryLabel}>Team Documents</Text>
+          <Text style={styles.summaryValue}>{documents.filter((d) => !!d.created_by_username && (d.created_by_username || '').toLowerCase() !== username.toLowerCase()).length}</Text>
         </View>
       </View>
 
+      <View style={styles.tabsWrap}>
+        {TABS.map((tab) => {
+          const selected = tab.key === activeTab;
+          return (
+            <TouchableOpacity
+              key={tab.key}
+              style={[styles.tabBtn, selected && styles.tabBtnSelected]}
+              onPress={() => setActiveTab(tab.key)}
+            >
+              <Text style={[styles.tabLabel, selected && styles.tabLabelSelected]}>{tab.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
       <FlatList
-        data={documents}
+        data={filteredDocuments}
         renderItem={renderDocumentItem}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContainer}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        onEndReached={loadMore}
-        onEndReachedThreshold={0.5}
-        ListFooterComponent={loadingMore ? <ActivityIndicator style={styles.loadingMore} /> : null}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={theme.colors.primaryAccent}
+            colors={[theme.colors.primaryAccent]}
+            progressBackgroundColor={theme.colors.surface}
+          />
+        }
+        onEndReached={activeTab === 'my_uploads' ? loadMore : undefined}
+        onEndReachedThreshold={0.4}
+        ListFooterComponent={loadingMore ? <ActivityIndicator style={styles.loadingMore} color={theme.colors.primaryAccent} /> : null}
         ListEmptyComponent={
           !loading ? (
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No documents found</Text>
+              <Text style={styles.emptyTitle}>{emptyMessage}</Text>
+              <TouchableOpacity style={styles.emptyCta} onPress={() => navigation.navigate('UploadDocument')}>
+                <Text style={styles.emptyCtaText}>Upload document</Text>
+              </TouchableOpacity>
             </View>
           ) : null
         }
       />
 
-      {loading && page === 1 && (
+      <UploadFab onPress={() => navigation.navigate('UploadDocument')} />
+
+      {loading && page === 1 ? (
         <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color="#007AFF" />
+          <ActivityIndicator size="large" color={theme.colors.primaryAccent} />
         </View>
-      )}
-    </View>
+      ) : null}
+    </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
+const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
+  StyleSheet.create({
+    container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.surfaceMuted,
   },
-  header: {
+  summaryCards: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    paddingHorizontal: theme.spacing[4],
+    paddingTop: theme.spacing[3],
+    paddingBottom: theme.spacing[2] + 2,
+    gap: theme.spacing[2],
   },
-  headerTitleBlock: {
+  summaryCard: {
     flex: 1,
-    marginRight: 8,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.lg,
+    paddingVertical: theme.spacing[2] + 2,
+    paddingHorizontal: theme.spacing[2] + 2,
+    shadowColor: theme.colors.textPrimary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  headerActions: {
+  summaryLabel: {
+    color: theme.colors.textMuted,
+    fontSize: theme.typography.size.xs,
+    marginBottom: theme.spacing[1],
+    fontFamily: theme.typography.fontFamilyPrimary,
+  },
+  summaryValue: {
+    color: theme.colors.textPrimary,
+    fontSize: theme.typography.size.xl,
+    fontWeight: theme.typography.weight.bold,
+    fontFamily: theme.typography.fontFamilyPrimary,
+  },
+  tabsWrap: {
     flexDirection: 'row',
+    paddingHorizontal: theme.spacing[4],
+    paddingTop: theme.spacing[2],
+    paddingBottom: theme.spacing[2] + 2,
+    gap: theme.spacing[2],
+  },
+  tabBtn: {
+    flex: 1,
+    borderRadius: theme.radius.pill,
+    paddingVertical: theme.spacing[2] + 2,
     alignItems: 'center',
+    backgroundColor: theme.colors.surfaceElevated,
   },
-  uploadButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
-    marginRight: 12,
+  tabBtnSelected: {
+    backgroundColor: theme.colors.primaryAccent,
   },
-  uploadButtonText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
+  tabLabel: {
+    fontSize: theme.typography.size.xs,
+    fontWeight: theme.typography.weight.semibold,
+    color: theme.colors.textSecondary,
+    fontFamily: theme.typography.fontFamilyPrimary,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  companyText: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
-  },
-  changeButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  changeButtonText: {
-    color: '#007AFF',
-    fontSize: 16,
+  tabLabelSelected: {
+    color: theme.colors.onPrimary,
   },
   listContainer: {
-    padding: 16,
-  },
-  documentCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  documentHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  fileName: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginRight: 12,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  statusText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  dateText: {
-    fontSize: 13,
-    color: '#666',
-    marginTop: 4,
+    paddingHorizontal: theme.spacing[4],
+    paddingBottom: 100,
   },
   emptyContainer: {
+    marginTop: theme.spacing[8] + theme.spacing[1],
     alignItems: 'center',
-    marginTop: 48,
   },
-  emptyText: {
-    fontSize: 16,
-    color: '#999',
+  emptyTitle: {
+    color: theme.colors.textMuted,
+    fontSize: theme.typography.size.md,
+    marginBottom: theme.spacing[3],
+    textAlign: 'center',
+    paddingHorizontal: theme.spacing[5],
+    fontFamily: theme.typography.fontFamilyPrimary,
+  },
+  emptyCta: {
+    backgroundColor: theme.colors.primaryAccent,
+    paddingHorizontal: theme.spacing[4],
+    paddingVertical: theme.spacing[2] + 2,
+    borderRadius: theme.radius.md,
+  },
+  emptyCtaText: {
+    color: theme.colors.onPrimary,
+    fontWeight: theme.typography.weight.bold,
+    fontFamily: theme.typography.fontFamilyPrimary,
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    backgroundColor: theme.colors.overlay,
     justifyContent: 'center',
     alignItems: 'center',
   },
   loadingMore: {
-    marginVertical: 16,
+    marginVertical: theme.spacing[4],
   },
-});
+  });

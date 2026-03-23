@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -11,8 +11,11 @@ import {
 import { CompanySelectionScreenProps } from '../types/navigation';
 import companyService, { TenantWorkspace } from '../services/company.service';
 import authService from '../services/auth.service';
+import { useTheme } from '../theme';
 
 export default function CompanySelectionScreen({ navigation }: CompanySelectionScreenProps) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const [companies, setCompanies] = useState<TenantWorkspace[]>([]);
   const [loading, setLoading] = useState(true);
   const [selecting, setSelecting] = useState(false);
@@ -25,6 +28,12 @@ export default function CompanySelectionScreen({ navigation }: CompanySelectionS
     try {
       const data = await companyService.getCompanies();
       setCompanies(data);
+      if (!data.length) {
+        Alert.alert(
+          'No workspaces found',
+          'No companies are currently available for this account. Please contact your admin or log in with another account.'
+        );
+      }
     } catch (error: any) {
       Alert.alert('Error', 'Failed to load companies. Please try again.');
     } finally {
@@ -86,7 +95,7 @@ export default function CompanySelectionScreen({ navigation }: CompanySelectionS
   if (loading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color={theme.colors.primaryAccent} />
       </View>
     );
   }
@@ -115,10 +124,11 @@ export default function CompanySelectionScreen({ navigation }: CompanySelectionS
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
+const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
+  StyleSheet.create({
+    container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.surfaceMuted,
   },
   centerContainer: {
     flex: 1,
@@ -129,37 +139,39 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#fff',
+    paddingHorizontal: theme.spacing[5],
+    paddingVertical: theme.spacing[4],
+    backgroundColor: theme.colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: theme.colors.border,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: theme.typography.size['2xl'],
+    fontWeight: theme.typography.weight.bold,
+    color: theme.colors.textPrimary,
+    fontFamily: theme.typography.fontFamilyPrimary,
   },
   logoutButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: theme.spacing[3],
+    paddingVertical: theme.spacing[1] + 2,
   },
   logoutText: {
-    color: '#FF3B30',
-    fontSize: 16,
+    color: theme.colors.error,
+    fontSize: theme.typography.size.body,
+    fontFamily: theme.typography.fontFamilyPrimary,
   },
   listContainer: {
-    padding: 16,
+    padding: theme.spacing[4],
   },
   companyCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing[4],
+    marginBottom: theme.spacing[3],
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    shadowColor: '#000',
+    shadowColor: theme.colors.textPrimary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -169,27 +181,30 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   companyName: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
+    fontSize: theme.typography.size.lg,
+    fontWeight: theme.typography.weight.semibold,
+    color: theme.colors.textPrimary,
+    fontFamily: theme.typography.fontFamilyPrimary,
   },
   roleText: {
-    fontSize: 13,
-    color: '#888',
-    marginTop: 4,
+    fontSize: theme.typography.size.sm,
+    color: theme.colors.textMuted,
+    marginTop: theme.spacing[1],
     textTransform: 'capitalize',
+    fontFamily: theme.typography.fontFamilyPrimary,
   },
   arrow: {
-    fontSize: 28,
-    color: '#ccc',
-    marginLeft: 12,
+    fontSize: theme.typography.size['3xl'],
+    color: theme.colors.textMuted,
+    marginLeft: theme.spacing[3],
   },
   emptyContainer: {
     alignItems: 'center',
-    marginTop: 48,
+    marginTop: theme.spacing[12],
   },
   emptyText: {
-    fontSize: 16,
-    color: '#999',
+    fontSize: theme.typography.size.body,
+    color: theme.colors.textMuted,
+    fontFamily: theme.typography.fontFamilyPrimary,
   },
-});
+  });

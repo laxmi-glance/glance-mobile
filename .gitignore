@@ -2,6 +2,19 @@
 
 # dependencies
 node_modules/
+.pnpm-store/
+.npm/
+.yarn/
+.yarn/cache/
+.yarn/unplugged/
+.yarn/build-state.yml
+.yarn/install-state.gz
+pnpm-lock.yaml
+package-lock.json
+npm-shrinkwrap.json
+yarn.lock
+bun.lockb
+bun.lock
 
 # Expo
 .expo/
@@ -25,6 +38,7 @@ expo-env.d.ts
 npm-debug.*
 yarn-debug.*
 yarn-error.*
+pnpm-debug.log*
 
 # macOS
 .DS_Store
