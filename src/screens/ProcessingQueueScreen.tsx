@@ -313,15 +313,18 @@ export default function ProcessingQueueScreen({ navigation }: ProcessingQueueScr
         {TABS.map((tab) => {
           const isActive = activeTab === tab.key;
           const value = tabCounts[tab.key] ?? 0;
+          const summaryCardStyle = [styles.summaryCard, isActive ? styles.summaryCardActive : null];
+          const summaryLabelStyle = [styles.summaryLabel, isActive ? styles.summaryLabelActive : null];
+          const summaryValueStyle = [styles.summaryValue, isActive ? styles.summaryValueActive : null];
           return (
             <TouchableOpacity
               key={`summary-${tab.key}`}
-              style={[styles.summaryCard, isActive && styles.summaryCardActive]}
+              style={summaryCardStyle}
               onPress={() => setActiveTab(tab.key)}
               activeOpacity={0.9}
             >
-              <Text style={[styles.summaryLabel, isActive && styles.summaryLabelActive]}>{tab.label}</Text>
-              <Text style={[styles.summaryValue, isActive && styles.summaryValueActive]}>{value}</Text>
+              <Text style={summaryLabelStyle}>{tab.label}</Text>
+              <Text style={summaryValueStyle}>{value}</Text>
             </TouchableOpacity>
           );
         })}

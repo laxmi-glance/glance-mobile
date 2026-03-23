@@ -238,6 +238,16 @@ export default function UploadDocumentScreen({ navigation }: UploadDocumentScree
 
   const progressPct =
     progress && progress.total > 0 ? Math.round((100 * progress.loaded) / progress.total) : null;
+  const cameraButtonStyle = [styles.secondaryBtn, styles.secondaryBtnSpacing];
+  const paymentValueStyle = [
+    styles.selectValue,
+    !selectedPaymentMethod ? styles.selectPlaceholder : null,
+  ];
+  const expenseValueStyle = [
+    styles.selectValue,
+    !selectedExpenseHead ? styles.selectPlaceholder : null,
+  ];
+  const noneOptionTextStyle = [styles.typeRowText, styles.selectPlaceholder];
 
   return (
     <SafeAreaView style={styles.flex} edges={['top']}>
@@ -259,7 +269,7 @@ export default function UploadDocumentScreen({ navigation }: UploadDocumentScree
             variant="outline"
             onPress={takePhoto}
             disabled={preparing || uploading}
-            style={[styles.secondaryBtn, styles.secondaryBtnSpacing]}
+            style={cameraButtonStyle}
           />
           <AppButton
             label="Gallery"
@@ -295,7 +305,7 @@ export default function UploadDocumentScreen({ navigation }: UploadDocumentScree
           onPress={() => setPaymentModalVisible(true)}
           disabled={uploading || ledgerLoading}
         >
-          <Text style={[styles.selectValue, !selectedPaymentMethod ? styles.selectPlaceholder : null]}>
+          <Text style={paymentValueStyle}>
             {selectedPaymentMethod?.label ?? 'Select payment method...'}
           </Text>
           {ledgerLoading ? (
@@ -311,7 +321,7 @@ export default function UploadDocumentScreen({ navigation }: UploadDocumentScree
           onPress={() => setExpenseModalVisible(true)}
           disabled={uploading || ledgerLoading}
         >
-          <Text style={[styles.selectValue, !selectedExpenseHead ? styles.selectPlaceholder : null]}>
+          <Text style={expenseValueStyle}>
             {selectedExpenseHead?.label ?? 'Search and select expense head...'}
           </Text>
           {ledgerLoading ? (
@@ -358,7 +368,7 @@ export default function UploadDocumentScreen({ navigation }: UploadDocumentScree
                   setPaymentModalVisible(false);
                 }}
               >
-                <Text style={[styles.typeRowText, styles.selectPlaceholder]}>None</Text>
+                <Text style={noneOptionTextStyle}>None</Text>
                 {!selectedPaymentMethod ? <Text style={styles.typeCheck}>✓</Text> : null}
               </TouchableOpacity>
               <FlatList
@@ -407,7 +417,7 @@ export default function UploadDocumentScreen({ navigation }: UploadDocumentScree
                   setExpenseModalVisible(false);
                 }}
               >
-                <Text style={[styles.typeRowText, styles.selectPlaceholder]}>None</Text>
+                <Text style={noneOptionTextStyle}>None</Text>
                 {!selectedExpenseHead ? <Text style={styles.typeCheck}>✓</Text> : null}
               </TouchableOpacity>
               <FlatList

@@ -26,18 +26,21 @@ export default function ThemeSettingsScreen({ navigation }: ThemeSettingsScreenP
       <View style={styles.content}>
         {OPTIONS.map((option) => {
           const isActive = mode === option.key;
+          const optionCardStyle = [styles.optionCard, isActive ? styles.optionCardActive : null];
+          const optionLabelStyle = [styles.optionLabel, isActive ? styles.optionLabelActive : null];
+          const radioOuterStyle = [styles.radioOuter, isActive ? styles.radioOuterActive : null];
           return (
             <TouchableOpacity
               key={option.key}
-              style={[styles.optionCard, isActive ? styles.optionCardActive : null]}
+              style={optionCardStyle}
               onPress={() => void setMode(option.key)}
               activeOpacity={0.9}
             >
               <View style={styles.optionTextWrap}>
-                <Text style={[styles.optionLabel, isActive ? styles.optionLabelActive : null]}>{option.label}</Text>
+                <Text style={optionLabelStyle}>{option.label}</Text>
                 <Text style={styles.optionHint}>{option.hint}</Text>
               </View>
-              <View style={[styles.radioOuter, isActive ? styles.radioOuterActive : null]}>
+              <View style={radioOuterStyle}>
                 {isActive ? <View style={styles.radioInner} /> : null}
               </View>
             </TouchableOpacity>

@@ -29,6 +29,8 @@ export default function DocumentCard({
 }: DocumentCardProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const approveButtonStyle = [styles.actionBtn, styles.approveBtn, actionLoading ? styles.actionBtnDisabled : null];
+  const rejectButtonStyle = [styles.actionBtn, styles.rejectBtn, actionLoading ? styles.actionBtnDisabled : null];
 
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.95}>
@@ -47,7 +49,7 @@ export default function DocumentCard({
       {showApprovalActions ? (
         <View style={styles.actionRow}>
           <TouchableOpacity
-            style={[styles.actionBtn, styles.approveBtn, actionLoading && styles.actionBtnDisabled]}
+            style={approveButtonStyle}
             onPress={onApprove}
             disabled={actionLoading}
           >
@@ -55,7 +57,7 @@ export default function DocumentCard({
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.actionBtn, styles.rejectBtn, actionLoading && styles.actionBtnDisabled]}
+            style={rejectButtonStyle}
             onPress={onReject}
             disabled={actionLoading}
           >

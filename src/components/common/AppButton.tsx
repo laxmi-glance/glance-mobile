@@ -25,36 +25,38 @@ export default function AppButton({
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const isDisabled = disabled || loading;
+  const indicatorColor = variant === 'primary' ? theme.colors.onPrimary : theme.colors.primaryAccent;
+  const textStyle = [
+    styles.label,
+    variant === 'primary' ? styles.primaryLabel : styles.outlineLabel,
+    variant === 'danger' ? styles.dangerLabel : null,
+  ];
+
+  const getContainerStyle = ({ pressed }: { pressed: boolean }) => {
+    const variantStyle = variant === 'primary' ? styles.primary : styles.outline;
+    const dangerStyle = variant === 'danger' ? styles.danger : null;
+    const pressedStyle =
+      pressed && !isDisabled
+        ? variant === 'primary'
+          ? styles.primaryPressed
+          : variant === 'danger'
+            ? styles.dangerPressed
+            : styles.outlinePressed
+        : null;
+
+    return [styles.base, variantStyle, dangerStyle, pressedStyle, isDisabled ? styles.disabled : null, style];
+  };
 
   return (
     <Pressable
       onPress={onPress}
       disabled={isDisabled}
-      style={({ pressed }) => [
-        styles.base,
-        variant === 'primary' ? styles.primary : styles.outline,
-        variant === 'danger' ? styles.danger : null,
-        pressed && !isDisabled
-          ? variant === 'primary'
-            ? styles.primaryPressed
-            : variant === 'danger'
-              ? styles.dangerPressed
-              : styles.outlinePressed
-          : null,
-        isDisabled ? styles.disabled : null,
-        style,
-      ]}
+      style={getContainerStyle}
     >
       {loading ? (
-        <ActivityIndicator color={variant === 'primary' ? theme.colors.onPrimary : theme.colors.primaryAccent} />
+        <ActivityIndicator color={indicatorColor} />
       ) : (
-        <Text
-          style={[
-            styles.label,
-            variant === 'primary' ? styles.primaryLabel : styles.outlineLabel,
-            variant === 'danger' ? styles.dangerLabel : null,
-          ]}
-        >
+        <Text style={textStyle}>
           {label}
         </Text>
       )}
