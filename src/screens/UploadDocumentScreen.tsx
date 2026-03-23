@@ -196,7 +196,11 @@ export default function UploadDocumentScreen({ navigation }: UploadDocumentScree
         {MAX_UPLOAD_BYTES / (1024 * 1024)} MB).</Text>
 
         <View style={styles.actionsRow}>
-          <TouchableOpacity style={styles.secondaryBtn} onPress={takePhoto} disabled={preparing || uploading}>
+          <TouchableOpacity
+            style={[styles.secondaryBtn, styles.secondaryBtnSpacing]}
+            onPress={takePhoto}
+            disabled={preparing || uploading}
+          >
             <Text style={styles.secondaryBtnText}>Camera</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.secondaryBtn} onPress={pickFromLibrary} disabled={preparing || uploading}>
@@ -277,7 +281,10 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: '#f5f5f5' },
   scroll: { padding: 16, paddingBottom: 32 },
   hint: { fontSize: 14, color: '#666', marginBottom: 16, lineHeight: 20 },
-  actionsRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },
+  actionsRow: { flexDirection: 'row', marginBottom: 16 },
+  secondaryBtnSpacing: {
+    marginRight: 12,
+  },
   secondaryBtn: {
     flex: 1,
     paddingVertical: 12,
@@ -322,8 +329,11 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     borderWidth: 1,
     borderColor: '#ddd',
-    textAlignVertical: 'top',
     fontSize: 16,
+    ...Platform.select({
+      android: { textAlignVertical: 'top' as const },
+      default: {},
+    }),
   },
   progressText: { textAlign: 'center', marginBottom: 12, color: '#007AFF', fontWeight: '600' },
   primaryBtn: {

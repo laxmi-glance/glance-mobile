@@ -3,6 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { RootStackParamList } from './src/types/navigation';
 import authService from './src/services/auth.service';
 import companyService from './src/services/company.service';
@@ -56,7 +57,7 @@ export default function App() {
   }
 
   return (
-    <>
+    <SafeAreaProvider>
       <NavigationContainer ref={navigationRef} onReady={onNavigationReady}>
         <Stack.Navigator
           initialRouteName={initialRoute}
@@ -98,7 +99,7 @@ export default function App() {
         </Stack.Navigator>
       </NavigationContainer>
       <StatusBar style="auto" />
-    </>
+    </SafeAreaProvider>
   );
 }
 

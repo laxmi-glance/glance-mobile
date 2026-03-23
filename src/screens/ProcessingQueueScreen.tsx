@@ -199,13 +199,13 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
   },
   uploadButton: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     backgroundColor: '#007AFF',
     borderRadius: 8,
+    marginRight: 12,
   },
   uploadButtonText: {
     color: '#fff',
