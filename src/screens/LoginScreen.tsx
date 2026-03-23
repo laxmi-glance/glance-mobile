@@ -14,19 +14,19 @@ import { LoginScreenProps } from '../types/navigation';
 import authService from '../services/auth.service';
 
 export default function LoginScreen({ navigation }: LoginScreenProps) {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please enter both email and password');
+    if (!username.trim() || !password) {
+      Alert.alert('Error', 'Please enter both username and password');
       return;
     }
 
     setLoading(true);
     try {
-      await authService.login({ email, password });
+      await authService.login({ username: username.trim(), password });
       // Navigate to company selection after successful login
       navigation.replace('CompanySelection');
     } catch (error: any) {
@@ -51,9 +51,9 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
         <View style={styles.form}>
           <TextInput
             style={styles.input}
-            placeholder="Email"
-            value={email}
-            onChangeText={setEmail}
+            placeholder="Username or email"
+            value={username}
+            onChangeText={setUsername}
             autoCapitalize="none"
             keyboardType="email-address"
             editable={!loading}

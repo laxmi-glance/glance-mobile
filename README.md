@@ -47,14 +47,15 @@ export const API_BASE_URL = __DEV__
 
 ### Important API Endpoints
 
-Make sure your backend has these endpoints:
+The app expects these routes (relative to `API_BASE_URL`, e.g. `https://staging.glancewise.app/api`):
 
-- `POST /api/auth/login/` - User login
-- `POST /api/auth/token/refresh/` - Refresh token
-- `GET /api/companies/` - Get list of companies
-- `GET /api/documents/processing-queue/` - Get processing queue
-- `GET /api/documents/{id}/` - Get document details
-- `POST /api/documents/{id}/retry/` - Retry failed document
+- `POST /users/login/` — body: `{ username, password }`; returns `access`, `refresh`, `tenants`, `pending_invitations`
+- `POST /users/token/refresh/` — body: `{ refresh }`
+- `POST /users/select-tenant/` — body: `{ tenant_id }` (tenant-scoped JWT)
+- `GET /users/my-tenants/` — list workspaces when login tenant cache is empty
+- `GET /users/me/` — profile (after tenant selection)
+- `GET /financial-document/financial-documents/` — paginated list; query `page`, `per_page`
+- `GET /financial-document/financial-document/{uuid}/` — document detail
 
 ## Running the App
 
@@ -102,17 +103,16 @@ glance-mobile/
 
 ### Authentication Flow
 
-1. User enters credentials on Login screen
-2. App calls `/api/auth/login/` endpoint
-3. Stores access token, refresh token, and user data in AsyncStorage
+1. User enters username (or email-as-username) and password on Login screen
+2. App calls `POST /users/login/`
+3. Stores access token, refresh token, and tenant list in AsyncStorage
 4. Navigates to Company Selection screen
 
 ### Company Selection
 
-1. Fetches list of companies from backend
-2. User selects a company
-3. Stores selected company in AsyncStorage
-4. Navigates to Processing Queue
+1. Loads tenants from login cache or `GET /users/my-tenants/`
+2. User selects a workspace — app calls `POST /users/select-tenant/` then stores selection
+3. Navigates to Processing Queue
 
 ### Processing Queue
 

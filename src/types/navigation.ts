@@ -4,10 +4,12 @@ export type RootStackParamList = {
   Login: undefined;
   CompanySelection: undefined;
   ProcessingQueue: undefined;
-  DocumentDetail: { documentId: number };
+  UploadDocument: undefined;
+  DocumentDetail: { documentId: string };
 };
 
 export type LoginScreenProps = NativeStackScreenProps<RootStackParamList, 'Login'>;
 export type CompanySelectionScreenProps = NativeStackScreenProps<RootStackParamList, 'CompanySelection'>;
 export type ProcessingQueueScreenProps = NativeStackScreenProps<RootStackParamList, 'ProcessingQueue'>;
 export type DocumentDetailScreenProps = NativeStackScreenProps<RootStackParamList, 'DocumentDetail'>;
+export type UploadDocumentScreenProps = NativeStackScreenProps<RootStackParamList, 'UploadDocument'>;

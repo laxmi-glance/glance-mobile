@@ -6,12 +6,15 @@ import { ActivityIndicator, View, StyleSheet } from 'react-native';
 import { RootStackParamList } from './src/types/navigation';
 import authService from './src/services/auth.service';
 import companyService from './src/services/company.service';
+import { navigationRef, resetToLogin, onNavigationReady } from './src/navigation/navigationRef';
+import { subscribeSessionExpired } from './src/core/auth/authEvents';
 
 // Screens
 import LoginScreen from './src/screens/LoginScreen';
 import CompanySelectionScreen from './src/screens/CompanySelectionScreen';
 import ProcessingQueueScreen from './src/screens/ProcessingQueueScreen';
 import DocumentDetailScreen from './src/screens/DocumentDetailScreen';
+import UploadDocumentScreen from './src/screens/UploadDocumentScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -21,6 +24,10 @@ export default function App() {
 
   useEffect(() => {
     checkAuthStatus();
+  }, []);
+
+  useEffect(() => {
+    return subscribeSessionExpired(resetToLogin);
   }, []);
 
   const checkAuthStatus = async () => {
@@ -50,7 +57,7 @@ export default function App() {
 
   return (
     <>
-      <NavigationContainer>
+      <NavigationContainer ref={navigationRef} onReady={onNavigationReady}>
         <Stack.Navigator
           initialRouteName={initialRoute}
           screenOptions={{
@@ -77,6 +84,11 @@ export default function App() {
             name="ProcessingQueue"
             component={ProcessingQueueScreen}
             options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="UploadDocument"
+            component={UploadDocumentScreen}
+            options={{ title: 'Upload document' }}
           />
           <Stack.Screen
             name="DocumentDetail"

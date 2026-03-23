@@ -9,12 +9,13 @@ import {
   Alert,
 } from 'react-native';
 import { CompanySelectionScreenProps } from '../types/navigation';
-import companyService, { Company } from '../services/company.service';
+import companyService, { TenantWorkspace } from '../services/company.service';
 import authService from '../services/auth.service';
 
 export default function CompanySelectionScreen({ navigation }: CompanySelectionScreenProps) {
-  const [companies, setCompanies] = useState<Company[]>([]);
+  const [companies, setCompanies] = useState<TenantWorkspace[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selecting, setSelecting] = useState(false);
 
   useEffect(() => {
     loadCompanies();
@@ -31,9 +32,22 @@ export default function CompanySelectionScreen({ navigation }: CompanySelectionS
     }
   };
 
-  const handleSelectCompany = async (company: Company) => {
-    await companyService.selectCompany(company);
-    navigation.replace('ProcessingQueue');
+  const handleSelectCompany = async (company: TenantWorkspace) => {
+    if (selecting) return;
+    setSelecting(true);
+    try {
+      await authService.selectTenant(company.tenant_id);
+      await companyService.selectCompany(company);
+      await authService.fetchProfile();
+      navigation.replace('ProcessingQueue');
+    } catch (error: unknown) {
+      const detail =
+        (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
+        'Could not open this workspace. Please try again.';
+      Alert.alert('Error', typeof detail === 'string' ? detail : 'Could not open this workspace.');
+    } finally {
+      setSelecting(false);
+    }
   };
 
   const handleLogout = async () => {
@@ -44,19 +58,26 @@ export default function CompanySelectionScreen({ navigation }: CompanySelectionS
         style: 'destructive',
         onPress: async () => {
           await authService.logout();
-          navigation.replace('Login');
+          // Explicit reset: session is cleared immediately; event-driven resetToLogin can
+          // race if the container is not ready—this keeps UX and state aligned.
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'Login' }],
+          });
         },
       },
     ]);
   };
 
-  const renderCompanyItem = ({ item }: { item: Company }) => (
+  const renderCompanyItem = ({ item }: { item: TenantWorkspace }) => (
     <TouchableOpacity
       style={styles.companyCard}
       onPress={() => handleSelectCompany(item)}
+      disabled={selecting}
     >
       <View style={styles.companyInfo}>
-        <Text style={styles.companyName}>{item.name}</Text>
+        <Text style={styles.companyName}>{item.company_name || 'Workspace'}</Text>
+        <Text style={styles.roleText}>{item.role}</Text>
       </View>
       <Text style={styles.arrow}>›</Text>
     </TouchableOpacity>
@@ -82,7 +103,7 @@ export default function CompanySelectionScreen({ navigation }: CompanySelectionS
       <FlatList
         data={companies}
         renderItem={renderCompanyItem}
-        keyExtractor={(item) => item.id.toString()}
+        keyExtractor={(item) => item.tenant_id}
         contentContainerStyle={styles.listContainer}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
@@ -151,6 +172,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#333',
+  },
+  roleText: {
+    fontSize: 13,
+    color: '#888',
+    marginTop: 4,
+    textTransform: 'capitalize',
   },
   arrow: {
     fontSize: 28,

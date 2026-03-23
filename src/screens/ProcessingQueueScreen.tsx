@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -10,109 +11,120 @@ import {
   Alert,
 } from 'react-native';
 import { ProcessingQueueScreenProps } from '../types/navigation';
-import documentService, { Document } from '../services/document.service';
+import documentService, { DocumentListItem } from '../services/document.service';
 import companyService from '../services/company.service';
 
+function getRowStatus(item: DocumentListItem): string {
+  if (item.approval_status) {
+    return item.approval_status;
+  }
+  if (item.status) {
+    return 'processing';
+  }
+  return 'pending';
+}
+
+function getStatusColor(status: string): string {
+  const s = status.toLowerCase();
+  if (s === 'approved') return '#34C759';
+  if (s === 'rejected') return '#FF3B30';
+  if (s === 'processing') return '#007AFF';
+  if (s === 'pending') return '#FF9500';
+  return '#8E8E93';
+}
+
 export default function ProcessingQueueScreen({ navigation }: ProcessingQueueScreenProps) {
-  const [documents, setDocuments] = useState<Document[]>([]);
+  const [documents, setDocuments] = useState<DocumentListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [companyName, setCompanyName] = useState('');
 
-  useEffect(() => {
-    loadCompanyInfo();
-    loadDocuments();
-  }, []);
-
-  const loadCompanyInfo = async () => {
-    const company = await companyService.getSelectedCompany();
-    if (company) {
-      setCompanyName(company.name);
-    }
-  };
-
-  const loadDocuments = async (pageNum: number = 1) => {
+  const loadDocuments = useCallback(async (pageNum: number = 1) => {
     try {
       const response = await documentService.getProcessingQueue({ page: pageNum });
-      
+
       if (pageNum === 1) {
         setDocuments(response.results);
       } else {
-        setDocuments(prev => [...prev, ...response.results]);
+        setDocuments((prev) => [...prev, ...response.results]);
       }
-      
+
       setHasMore(!!response.next);
       setPage(pageNum);
-    } catch (error: any) {
+    } catch {
       Alert.alert('Error', 'Failed to load documents. Please try again.');
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setLoadingMore(false);
     }
-  };
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      (async () => {
+        const company = await companyService.getSelectedCompany();
+        if (company) {
+          setCompanyName(company.company_name || 'Workspace');
+        }
+        await loadDocuments(1);
+      })();
+    }, [loadDocuments])
+  );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     loadDocuments(1);
-  }, []);
+  }, [loadDocuments]);
 
   const loadMore = () => {
-    if (!loading && hasMore) {
-      setLoading(true);
+    if (!loadingMore && hasMore && !loading) {
+      setLoadingMore(true);
       loadDocuments(page + 1);
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return '#34C759';
-      case 'processing':
-        return '#007AFF';
-      case 'failed':
-        return '#FF3B30';
-      case 'pending':
-        return '#FF9500';
-      default:
-        return '#8E8E93';
-    }
-  };
-
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | undefined) => {
+    if (!dateString) return '—';
     const date = new Date(dateString);
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    });
+    return (
+      date.toLocaleDateString() +
+      ' ' +
+      date.toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    );
   };
 
-  const renderDocumentItem = ({ item }: { item: Document }) => (
-    <TouchableOpacity
-      style={styles.documentCard}
-      onPress={() => navigation.navigate('DocumentDetail', { documentId: item.id })}
-    >
-      <View style={styles.documentHeader}>
-        <Text style={styles.fileName} numberOfLines={1}>
-          {item.file_name}
-        </Text>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-          <Text style={styles.statusText}>{item.status.toUpperCase()}</Text>
+  const openDocument = (item: DocumentListItem) => {
+    if (item.approval_status == null && item.status) {
+      Alert.alert('Processing', 'This file is still being processed.');
+      return;
+    }
+    navigation.navigate('DocumentDetail', { documentId: item.id });
+  };
+
+  const renderDocumentItem = ({ item }: { item: DocumentListItem }) => {
+    const status = getRowStatus(item);
+    return (
+      <TouchableOpacity style={styles.documentCard} onPress={() => openDocument(item)}>
+        <View style={styles.documentHeader}>
+          <Text style={styles.fileName} numberOfLines={1}>
+            {item.file_name || item.invoice_number || 'Document'}
+          </Text>
+          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(status) }]}>
+            <Text style={styles.statusText}>{status.toUpperCase()}</Text>
+          </View>
         </View>
-      </View>
-      
-      <Text style={styles.dateText}>
-        Uploaded: {formatDate(item.uploaded_at)}
-      </Text>
-      
-      {item.processed_at && (
-        <Text style={styles.dateText}>
-          Processed: {formatDate(item.processed_at)}
-        </Text>
-      )}
-    </TouchableOpacity>
-  );
+
+        <Text style={styles.dateText}>Created: {formatDate(item.created_on)}</Text>
+      </TouchableOpacity>
+    );
+  };
 
   const handleChangeCompany = () => {
     navigation.replace('CompanySelection');
@@ -121,30 +133,32 @@ export default function ProcessingQueueScreen({ navigation }: ProcessingQueueScr
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Processing Queue</Text>
+        <View style={styles.headerTitleBlock}>
+          <Text style={styles.title}>Documents</Text>
           <Text style={styles.companyText}>{companyName}</Text>
         </View>
-        <TouchableOpacity onPress={handleChangeCompany} style={styles.changeButton}>
-          <Text style={styles.changeButtonText}>Change</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('UploadDocument')}
+            style={styles.uploadButton}
+          >
+            <Text style={styles.uploadButtonText}>Upload</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleChangeCompany} style={styles.changeButton}>
+            <Text style={styles.changeButtonText}>Change</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <FlatList
         data={documents}
         renderItem={renderDocumentItem}
-        keyExtractor={(item) => item.id.toString()}
+        keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContainer}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
-        ListFooterComponent={
-          loading && page > 1 ? (
-            <ActivityIndicator style={styles.loadingMore} />
-          ) : null
-        }
+        ListFooterComponent={loadingMore ? <ActivityIndicator style={styles.loadingMore} /> : null}
         ListEmptyComponent={
           !loading ? (
             <View style={styles.emptyContainer}>
@@ -177,6 +191,26 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
+  },
+  headerTitleBlock: {
+    flex: 1,
+    marginRight: 8,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  uploadButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#007AFF',
+    borderRadius: 8,
+  },
+  uploadButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
   },
   title: {
     fontSize: 24,

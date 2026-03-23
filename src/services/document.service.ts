@@ -1,19 +1,22 @@
 import apiClient from '../config/api';
+import type { DocumentTypeValue } from '../constants/documentTypes';
 
-export interface Document {
-  id: number;
-  file_name: string;
-  status: 'processing' | 'completed' | 'failed' | 'pending';
-  uploaded_at: string;
-  processed_at?: string;
-  file_type?: string;
-  file_size?: number;
-  // Add other document fields as needed
+/** Row from GET /financial-document/financial-documents/ (includes preprocessing stubs). */
+export interface DocumentListItem {
+  id: string;
+  file_name?: string | null;
+  approval_status?: string | null;
+  /** Preprocessing rows only — human-readable status text */
+  status?: string;
+  created_on?: string;
+  gl_posting_status?: string;
+  invoice_number?: string | null;
 }
 
 export interface ProcessingQueueParams {
   page?: number;
-  page_size?: number;
+  /** Backend uses `per_page` (see CustomPagination). */
+  per_page?: number;
   status?: string;
   search?: string;
 }
@@ -22,41 +25,81 @@ export interface ProcessingQueueResponse {
   count: number;
   next: string | null;
   previous: string | null;
-  results: Document[];
+  results: DocumentListItem[];
+}
+
+export interface UploadFinancialDocumentFields {
+  documentType: DocumentTypeValue;
+  notes?: string;
+}
+
+/** Response shapes from `process_financial_document_upload` (200 / 207 / 409). */
+export interface UploadFinancialDocumentResponse {
+  message?: string;
+  success_count?: number;
+  duplicate_count?: number;
+  error_count?: number;
+  duplicates?: unknown[];
+  errors?: string[];
+  detail?: string;
+}
+
+export interface UploadFinancialDocumentProgress {
+  loaded: number;
+  total: number;
 }
 
 class DocumentService {
   async getProcessingQueue(params?: ProcessingQueueParams): Promise<ProcessingQueueResponse> {
-    try {
-      const response = await apiClient.get<ProcessingQueueResponse>('/documents/processing-queue/', {
-        params: {
-          page: params?.page || 1,
-          page_size: params?.page_size || 20,
-          ...params,
+    const response = await apiClient.get<ProcessingQueueResponse>('/financial-document/financial-documents/', {
+      params: {
+        page: params?.page ?? 1,
+        per_page: params?.per_page ?? 20,
+        ...(params?.status ? { status: params.status } : {}),
+        ...(params?.search ? { search: params.search } : {}),
+      },
+    });
+    return response.data;
+  }
+
+  async getDocumentDetail(documentId: string): Promise<Record<string, unknown>> {
+    const response = await apiClient.get<Record<string, unknown>>(
+      `/financial-document/financial-document/${documentId}/`
+    );
+    return response.data;
+  }
+
+  /**
+   * Multipart upload to `POST /financial-document/upload-financial-documents/`.
+   * File field name `invoices` matches backend `getlist("invoices")`.
+   */
+  async uploadFinancialDocument(
+    file: { uri: string; name: string; type: string },
+    fields: UploadFinancialDocumentFields,
+    onProgress?: (p: UploadFinancialDocumentProgress) => void
+  ): Promise<UploadFinancialDocumentResponse> {
+    const formData = new FormData();
+    formData.append(
+      'invoices',
+      { uri: file.uri, name: file.name, type: file.type } as unknown as Blob
+    );
+    formData.append('document_type', fields.documentType);
+    if (fields.notes?.trim()) {
+      formData.append('notes', fields.notes.trim());
+    }
+
+    const response = await apiClient.post<UploadFinancialDocumentResponse>(
+      '/financial-document/upload-financial-documents/',
+      formData,
+      {
+        onUploadProgress: (evt) => {
+          if (onProgress && evt.total != null && evt.total > 0) {
+            onProgress({ loaded: evt.loaded, total: evt.total });
+          }
         },
-      });
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  async getDocumentDetail(documentId: number): Promise<Document> {
-    try {
-      const response = await apiClient.get<Document>(`/documents/${documentId}/`);
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  async retryDocument(documentId: number): Promise<Document> {
-    try {
-      const response = await apiClient.post<Document>(`/documents/${documentId}/retry/`);
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
+      }
+    );
+    return response.data;
   }
 }
 

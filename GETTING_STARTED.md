@@ -87,20 +87,20 @@ npm run web
    - Tap any document to view details
 
 4. **Document Details**
-   - View complete document information
-   - Retry failed documents
+   - View key fields from the financial document detail API
 
 ### Backend Requirements
 
-Your Django backend must have these endpoints:
+Your Django backend must expose (under `/api/`):
 
 ```
-POST /api/auth/login/
-POST /api/auth/token/refresh/
-GET  /api/companies/
-GET  /api/documents/processing-queue/
-GET  /api/documents/{id}/
-POST /api/documents/{id}/retry/
+POST /users/login/
+POST /users/token/refresh/
+POST /users/select-tenant/
+GET  /users/my-tenants/
+GET  /users/me/
+GET  /financial-document/financial-documents/
+GET  /financial-document/financial-document/{uuid}/
 ```
 
 ## Common Issues & Solutions
@@ -267,10 +267,9 @@ eas build --platform ios --profile preview
 - [ ] Backend is running and accessible
 - [ ] CORS is configured correctly
 - [ ] Auth endpoints return correct format
-- [ ] Company endpoint returns list of companies
-- [ ] Processing queue endpoint supports pagination
-- [ ] Document detail endpoint works
-- [ ] Retry endpoint works for failed documents
+- [ ] `my-tenants` / login `tenants` list works for workspace selection
+- [ ] Financial documents list supports pagination (`page`, `per_page`)
+- [ ] Document detail endpoint works for financial document UUIDs
 
 ## Next Steps After Setup
 

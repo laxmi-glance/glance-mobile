@@ -1,80 +1,113 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import apiClient from '../config/api';
+import { clearSession } from '../core/auth/session';
+import { getAccessToken, getRefreshToken, setAccessToken, setTokens } from '../core/auth/tokenStorage';
+
+const PROFILE_KEY = 'user';
 
 export interface LoginCredentials {
-  email: string;
+  /** Django `authenticate` username — often the same as email */
+  username: string;
   password: string;
 }
 
-export interface User {
-  id: number;
-  email: string;
-  first_name: string;
-  last_name: string;
-  // Add other user fields as needed
+export interface LoginTenant {
+  tenant_id: string;
+  company_name: string | null;
+  role: string;
 }
 
-export interface AuthResponse {
+/** Response from POST /users/login/ */
+export interface LoginResponse {
   access: string;
   refresh: string;
-  user: User;
+  tenants: LoginTenant[];
+  pending_invitations: unknown[];
+}
+
+export interface UserProfile {
+  id: string;
+  email?: string;
+  username?: string;
+  first_name?: string;
+  last_name?: string;
+  tenant_id?: string;
+  company_name?: string | null;
+  role?: string;
+  [key: string]: unknown;
 }
 
 class AuthService {
-  async login(credentials: LoginCredentials): Promise<AuthResponse> {
+  async login(credentials: LoginCredentials): Promise<LoginResponse> {
+    const response = await apiClient.post<LoginResponse>('/users/login/', {
+      username: credentials.username.trim(),
+      password: credentials.password,
+    });
+
+    const { access, refresh, tenants } = response.data;
+
+    await setTokens(access, refresh);
+    await AsyncStorage.setItem('loginTenants', JSON.stringify(tenants ?? []));
+
+    return response.data;
+  }
+
+  /**
+   * Exchange basic JWT for tenant-scoped tokens (required before tenant-specific APIs).
+   */
+  async selectTenant(tenantId: string): Promise<void> {
+    const response = await apiClient.post<{ access: string; refresh: string }>('/users/select-tenant/', {
+      tenant_id: tenantId,
+    });
+
+    await setTokens(response.data.access, response.data.refresh);
+  }
+
+  /** Load profile (optional); stores JSON under `user` for getCurrentUser. */
+  async fetchProfile(): Promise<UserProfile | null> {
     try {
-      const response = await apiClient.post<AuthResponse>('/auth/login/', credentials);
-      
-      // Store tokens and user data
-      await AsyncStorage.setItem('authToken', response.data.access);
-      await AsyncStorage.setItem('refreshToken', response.data.refresh);
-      await AsyncStorage.setItem('user', JSON.stringify(response.data.user));
-      
+      const response = await apiClient.get<UserProfile>('/users/me/');
+      await AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(response.data));
       return response.data;
-    } catch (error) {
-      throw error;
+    } catch {
+      return null;
     }
   }
 
   async logout(): Promise<void> {
     try {
-      await AsyncStorage.multiRemove(['authToken', 'refreshToken', 'user', 'selectedCompany']);
+      await clearSession();
     } catch (error) {
       console.error('Logout error:', error);
     }
   }
 
-  async getCurrentUser(): Promise<User | null> {
+  async getCurrentUser(): Promise<UserProfile | null> {
     try {
-      const userStr = await AsyncStorage.getItem('user');
-      return userStr ? JSON.parse(userStr) : null;
-    } catch (error) {
+      const userStr = await AsyncStorage.getItem(PROFILE_KEY);
+      return userStr ? (JSON.parse(userStr) as UserProfile) : null;
+    } catch {
       return null;
     }
   }
 
   async isAuthenticated(): Promise<boolean> {
-    const token = await AsyncStorage.getItem('authToken');
+    const token = await getAccessToken();
     return !!token;
   }
 
   async refreshToken(): Promise<string> {
-    try {
-      const refreshToken = await AsyncStorage.getItem('refreshToken');
-      if (!refreshToken) {
-        throw new Error('No refresh token available');
-      }
-
-      const response = await apiClient.post<{ access: string }>('/auth/token/refresh/', {
-        refresh: refreshToken,
-      });
-
-      await AsyncStorage.setItem('authToken', response.data.access);
-      return response.data.access;
-    } catch (error) {
-      await this.logout();
-      throw error;
+    const refresh = await getRefreshToken();
+    if (!refresh) {
+      throw new Error('No refresh token available');
     }
+
+    const response = await apiClient.post<{ access: string }>('/users/token/refresh/', {
+      refresh,
+    });
+
+    await setAccessToken(response.data.access);
+    return response.data.access;
   }
 }
 

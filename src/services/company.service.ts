@@ -1,36 +1,41 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import apiClient from '../config/api';
+import type { LoginTenant } from './auth.service';
 
-export interface Company {
-  id: number;
-  name: string;
-  logo?: string;
-  // Add other company fields as needed
-}
+export type TenantWorkspace = LoginTenant;
 
 class CompanyService {
-  async getCompanies(): Promise<Company[]> {
-    try {
-      const response = await apiClient.get<Company[]>('/companies/');
-      return response.data;
-    } catch (error) {
-      throw error;
+  /**
+   * Tenants from login cache, or GET /users/my-tenants/ when cache is missing (e.g. cold start).
+   */
+  async getCompanies(): Promise<TenantWorkspace[]> {
+    const cached = await AsyncStorage.getItem('loginTenants');
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached) as TenantWorkspace[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      } catch {
+        // fall through to API
+      }
     }
+
+    const response = await apiClient.get<{ tenants: TenantWorkspace[] }>('/users/my-tenants/');
+    const tenants = response.data.tenants ?? [];
+    await AsyncStorage.setItem('loginTenants', JSON.stringify(tenants));
+    return tenants;
   }
 
-  async selectCompany(company: Company): Promise<void> {
-    try {
-      await AsyncStorage.setItem('selectedCompany', JSON.stringify(company));
-    } catch (error) {
-      console.error('Error selecting company:', error);
-    }
+  async selectCompany(company: TenantWorkspace): Promise<void> {
+    await AsyncStorage.setItem('selectedCompany', JSON.stringify(company));
   }
 
-  async getSelectedCompany(): Promise<Company | null> {
+  async getSelectedCompany(): Promise<TenantWorkspace | null> {
     try {
       const companyStr = await AsyncStorage.getItem('selectedCompany');
-      return companyStr ? JSON.parse(companyStr) : null;
-    } catch (error) {
+      return companyStr ? (JSON.parse(companyStr) as TenantWorkspace) : null;
+    } catch {
       return null;
     }
   }

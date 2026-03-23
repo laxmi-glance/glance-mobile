@@ -23,13 +23,25 @@
       },
       "package": "com.glancewise.mobile",
       "permissions": [
-        "android.permission.INTERNET"
+        "android.permission.INTERNET",
+        "android.permission.CAMERA",
+        "android.permission.READ_MEDIA_IMAGES"
       ],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Glancewise to access your photos to upload documents.",
+          "cameraPermission": "Allow Glancewise to use the camera to capture documents."
+        }
+      ]
+    ]
   }
 }

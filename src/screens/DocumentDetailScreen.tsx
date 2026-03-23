@@ -5,17 +5,23 @@ import {
   StyleSheet,
   ActivityIndicator,
   ScrollView,
-  TouchableOpacity,
   Alert,
 } from 'react-native';
 import { DocumentDetailScreenProps } from '../types/navigation';
-import documentService, { Document } from '../services/document.service';
+import documentService from '../services/document.service';
+
+function getStatusColor(status: string): string {
+  const s = status.toLowerCase();
+  if (s === 'approved') return '#34C759';
+  if (s === 'rejected') return '#FF3B30';
+  if (s === 'pending') return '#FF9500';
+  return '#8E8E93';
+}
 
 export default function DocumentDetailScreen({ route, navigation }: DocumentDetailScreenProps) {
   const { documentId } = route.params;
-  const [document, setDocument] = useState<Document | null>(null);
+  const [detail, setDetail] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
-  const [retrying, setRetrying] = useState(false);
 
   useEffect(() => {
     loadDocumentDetail();
@@ -24,8 +30,8 @@ export default function DocumentDetailScreen({ route, navigation }: DocumentDeta
   const loadDocumentDetail = async () => {
     try {
       const data = await documentService.getDocumentDetail(documentId);
-      setDocument(data);
-    } catch (error: any) {
+      setDetail(data);
+    } catch {
       Alert.alert('Error', 'Failed to load document details.');
       navigation.goBack();
     } finally {
@@ -33,54 +39,12 @@ export default function DocumentDetailScreen({ route, navigation }: DocumentDeta
     }
   };
 
-  const handleRetry = async () => {
-    if (!document) return;
-
-    Alert.alert('Retry Processing', 'Are you sure you want to retry processing this document?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Retry',
-        onPress: async () => {
-          setRetrying(true);
-          try {
-            const updatedDoc = await documentService.retryDocument(document.id);
-            setDocument(updatedDoc);
-            Alert.alert('Success', 'Document queued for reprocessing');
-          } catch (error: any) {
-            Alert.alert('Error', 'Failed to retry document processing');
-          } finally {
-            setRetrying(false);
-          }
-        },
-      },
-    ]);
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return '#34C759';
-      case 'processing':
-        return '#007AFF';
-      case 'failed':
-        return '#FF3B30';
-      case 'pending':
-        return '#FF9500';
-      default:
-        return '#8E8E93';
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
-  };
-
-  const formatFileSize = (bytes?: number) => {
-    if (!bytes) return 'Unknown';
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+  const formatDate = (value: unknown) => {
+    if (value == null || value === '') return '—';
+    const s = String(value);
+    const date = new Date(s);
+    if (Number.isNaN(date.getTime())) return s;
+    return date.toLocaleString();
   };
 
   if (loading) {
@@ -91,60 +55,41 @@ export default function DocumentDetailScreen({ route, navigation }: DocumentDeta
     );
   }
 
-  if (!document) {
+  if (!detail) {
     return null;
   }
+
+  const fileName = (detail.file_name as string) || 'Document';
+  const approvalStatus = String(detail.approval_status ?? '—');
+  const glStatus = String(detail.gl_posting_status ?? '—');
 
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.fileName}>{document.file_name}</Text>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(document.status) }]}>
-          <Text style={styles.statusText}>{document.status.toUpperCase()}</Text>
+        <Text style={styles.fileName}>{fileName}</Text>
+        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(approvalStatus) }]}>
+          <Text style={styles.statusText}>{approvalStatus.toUpperCase()}</Text>
         </View>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Document Information</Text>
-        
+        <Text style={styles.sectionTitle}>Document</Text>
+
         <View style={styles.infoRow}>
-          <Text style={styles.label}>File Type:</Text>
-          <Text style={styles.value}>{document.file_type || 'N/A'}</Text>
+          <Text style={styles.label}>Invoice #</Text>
+          <Text style={styles.value}>{String(detail.invoice_number ?? '—')}</Text>
         </View>
 
         <View style={styles.infoRow}>
-          <Text style={styles.label}>File Size:</Text>
-          <Text style={styles.value}>{formatFileSize(document.file_size)}</Text>
+          <Text style={styles.label}>GL posting</Text>
+          <Text style={styles.value}>{glStatus}</Text>
         </View>
 
         <View style={styles.infoRow}>
-          <Text style={styles.label}>Uploaded:</Text>
-          <Text style={styles.value}>{formatDate(document.uploaded_at)}</Text>
+          <Text style={styles.label}>Created</Text>
+          <Text style={styles.value}>{formatDate(detail.created_on)}</Text>
         </View>
-
-        {document.processed_at && (
-          <View style={styles.infoRow}>
-            <Text style={styles.label}>Processed:</Text>
-            <Text style={styles.value}>{formatDate(document.processed_at)}</Text>
-          </View>
-        )}
       </View>
-
-      {document.status === 'failed' && (
-        <View style={styles.section}>
-          <TouchableOpacity
-            style={[styles.retryButton, retrying && styles.retryButtonDisabled]}
-            onPress={handleRetry}
-            disabled={retrying}
-          >
-            {retrying ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.retryButtonText}>Retry Processing</Text>
-            )}
-          </TouchableOpacity>
-        </View>
-      )}
     </ScrollView>
   );
 }
@@ -208,19 +153,8 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#333',
     fontWeight: '500',
-  },
-  retryButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  retryButtonDisabled: {
-    opacity: 0.6,
-  },
-  retryButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    flex: 1,
+    textAlign: 'right',
+    marginLeft: 12,
   },
 });
