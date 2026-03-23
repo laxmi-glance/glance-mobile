@@ -20,14 +20,14 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
   StyleSheet.create({
     wrap: {
     position: 'absolute',
-    right: theme.spacing[4] + 2,
-    bottom: theme.spacing[4] + 2,
+    right: theme.spacing[5],
+    bottom: theme.spacing[5],
   },
   fab: {
     backgroundColor: theme.colors.primaryAccent,
     borderRadius: theme.radius.pill,
     minHeight: 56,
-    paddingHorizontal: theme.spacing[4] + 2,
+    paddingHorizontal: theme.spacing[5],
     alignItems: 'center',
     flexDirection: 'row',
     shadowColor: theme.colors.primaryAccent,
@@ -36,14 +36,14 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
   plus: {
     color: theme.colors.onPrimary,
     fontSize: theme.typography.size.xl,
-    marginRight: theme.spacing[1] + 2,
+    marginRight: theme.spacing[2],
     fontWeight: theme.typography.weight.bold,
     fontFamily: theme.typography.fontFamilyPrimary,
   },
   label: {
     color: theme.colors.onPrimary,
-    fontWeight: theme.typography.weight.bold,
-    fontSize: theme.typography.size.body,
+    fontWeight: theme.button.fontWeight,
+    fontSize: theme.button.fontSize,
     fontFamily: theme.typography.fontFamilyPrimary,
   },
   });

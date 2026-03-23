@@ -38,8 +38,8 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
   StyleSheet.create({
     badge: {
       borderRadius: theme.radius.pill,
-      paddingHorizontal: theme.spacing[2] + 2,
-      paddingVertical: theme.spacing[1] + 1,
+      paddingHorizontal: theme.spacing[3],
+      paddingVertical: theme.spacing[1],
     },
     label: {
       fontSize: theme.typography.size.xs,

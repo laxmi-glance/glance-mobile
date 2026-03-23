@@ -41,6 +41,8 @@ export interface DocumentStats {
 export interface UploadFinancialDocumentFields {
   documentType: DocumentTypeValue;
   notes?: string;
+  paymentMethodId?: string;
+  expenseHeadId?: string;
 }
 
 /** Response shapes from `process_financial_document_upload` (200 / 207 / 409). */
@@ -59,6 +61,15 @@ export interface UploadFinancialDocumentProgress {
   total: number;
 }
 
+export interface LedgerAccountGroup {
+  label: string;
+  options: Array<{
+    id: string;
+    title: string;
+    statutory_code?: string | null;
+  }>;
+}
+
 class DocumentService {
   async getProcessingQueue(params?: ProcessingQueueParams): Promise<ProcessingQueueResponse> {
     const response = await apiClient.get<ProcessingQueueResponse>('/financial-document/financial-documents/', {
@@ -75,6 +86,11 @@ class DocumentService {
   async getDocumentStats(): Promise<DocumentStats> {
     const response = await apiClient.get<DocumentStats>('/financial-document/financial-documents/stats/');
     return response.data;
+  }
+
+  async getLedgerAccountsByGroups(): Promise<LedgerAccountGroup[]> {
+    const response = await apiClient.get<LedgerAccountGroup[]>('/ledger/ledger-account/by-groups/');
+    return response.data || [];
   }
 
   async getDocumentDetail(documentId: string): Promise<Record<string, unknown>> {
@@ -112,6 +128,12 @@ class DocumentService {
     formData.append('document_type', fields.documentType);
     if (fields.notes?.trim()) {
       formData.append('notes', fields.notes.trim());
+    }
+    if (fields.paymentMethodId) {
+      formData.append('payment_method', fields.paymentMethodId);
+    }
+    if (fields.expenseHeadId) {
+      formData.append('expense_head', fields.expenseHeadId);
     }
 
     const response = await apiClient.post<UploadFinancialDocumentResponse>(

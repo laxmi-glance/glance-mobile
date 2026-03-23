@@ -8,10 +8,12 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { CompanySelectionScreenProps } from '../types/navigation';
 import companyService, { TenantWorkspace } from '../services/company.service';
 import authService from '../services/auth.service';
 import { useTheme } from '../theme';
+import AppButton from '../components/common/AppButton';
 
 export default function CompanySelectionScreen({ navigation }: CompanySelectionScreenProps) {
   const { theme } = useTheme();
@@ -101,12 +103,21 @@ export default function CompanySelectionScreen({ navigation }: CompanySelectionS
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          {navigation.canGoBack() ? (
+            <AppButton label="Back" variant="outline" onPress={() => navigation.goBack()} style={styles.backButton} />
+          ) : (
+            <View style={styles.backPlaceholder} />
+          )}
+        </View>
+
         <Text style={styles.title}>Select Company</Text>
-        <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-          <Text style={styles.logoutText}>Logout</Text>
-        </TouchableOpacity>
+
+        <View style={styles.headerRight}>
+          <AppButton label="Logout" variant="danger" onPress={handleLogout} style={styles.logoutButton} />
+        </View>
       </View>
 
       <FlatList
@@ -120,7 +131,7 @@ export default function CompanySelectionScreen({ navigation }: CompanySelectionS
           </View>
         }
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -137,7 +148,6 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: theme.spacing[5],
     paddingVertical: theme.spacing[4],
@@ -145,20 +155,33 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
   },
+  headerLeft: {
+    width: 96,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+  },
+  headerRight: {
+    width: 96,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
+  backButton: {
+    minWidth: 84,
+  },
+  backPlaceholder: {
+    width: 1,
+    height: 1,
+  },
   title: {
-    fontSize: theme.typography.size['2xl'],
+    flex: 1,
+    textAlign: 'center',
+    fontSize: theme.typography.size.lg,
     fontWeight: theme.typography.weight.bold,
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamilyPrimary,
   },
   logoutButton: {
-    paddingHorizontal: theme.spacing[3],
-    paddingVertical: theme.spacing[1] + 2,
-  },
-  logoutText: {
-    color: theme.colors.error,
-    fontSize: theme.typography.size.body,
-    fontFamily: theme.typography.fontFamilyPrimary,
+    minWidth: 84,
   },
   listContainer: {
     padding: theme.spacing[4],
@@ -194,7 +217,7 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
     fontFamily: theme.typography.fontFamilyPrimary,
   },
   arrow: {
-    fontSize: theme.typography.size['3xl'],
+    fontSize: theme.typography.size.xl,
     color: theme.colors.textMuted,
     marginLeft: theme.spacing[3],
   },

@@ -3,16 +3,15 @@ import {
   View,
   Text,
   TextInput,
-  TouchableOpacity,
   StyleSheet,
   Alert,
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
 import { LoginScreenProps } from '../types/navigation';
 import authService from '../services/auth.service';
 import { useTheme } from '../theme';
+import AppButton from '../components/common/AppButton';
 
 export default function LoginScreen({ navigation }: LoginScreenProps) {
   const { theme } = useTheme();
@@ -73,17 +72,14 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
             editable={!loading}
           />
 
-          <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
+          <AppButton
+            label="Sign In"
+            variant="primary"
             onPress={handleLogin}
+            loading={loading}
             disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color={theme.colors.onPrimary} />
-            ) : (
-              <Text style={styles.buttonText}>Sign In</Text>
-            )}
-          </TouchableOpacity>
+            style={styles.button}
+          />
         </View>
       </View>
     </KeyboardAvoidingView>
@@ -102,7 +98,7 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
     paddingHorizontal: theme.spacing[6],
   },
   title: {
-    fontSize: theme.typography.size['3xl'],
+    fontSize: theme.typography.size['2xl'],
     fontWeight: theme.typography.weight.bold,
     color: theme.colors.textPrimary,
     marginBottom: theme.spacing[2],
@@ -132,19 +128,6 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
     fontFamily: theme.typography.fontFamilyPrimary,
   },
   button: {
-    backgroundColor: theme.colors.primaryAccent,
-    borderRadius: theme.radius.sm,
-    paddingVertical: theme.spacing[3] + 2,
-    alignItems: 'center',
     marginTop: theme.spacing[2],
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: theme.colors.onPrimary,
-    fontSize: theme.typography.size.body,
-    fontWeight: theme.typography.weight.semibold,
-    fontFamily: theme.typography.fontFamilyPrimary,
   },
   });

@@ -106,7 +106,7 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
     borderBottomColor: theme.colors.border,
   },
   fileName: {
-    fontSize: theme.typography.size.xl,
+    fontSize: theme.typography.size.lg,
     fontWeight: theme.typography.weight.bold,
     color: theme.colors.textPrimary,
     marginBottom: theme.spacing[3],

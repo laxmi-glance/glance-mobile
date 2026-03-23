@@ -19,13 +19,14 @@ import UploadFab from '../components/dashboard/UploadFab';
 import documentService, { DocumentListItem, DocumentStats } from '../services/document.service';
 import companyService from '../services/company.service';
 import { useTheme } from '../theme';
+import AppButton from '../components/common/AppButton';
 
-type DashboardTab = 'my_uploads' | 'pending_approval' | 'team_documents';
+type DashboardTab = 'my_uploads' | 'approval_request' | 'approval_awaiting';
 
 const TABS: Array<{ key: DashboardTab; label: string }> = [
   { key: 'my_uploads', label: 'My Uploads' },
-  { key: 'pending_approval', label: 'Pending Approval' },
-  { key: 'team_documents', label: 'Team Documents' },
+  { key: 'approval_request', label: 'Approval Request' },
+  { key: 'approval_awaiting', label: 'Approval Awaiting' },
 ];
 
 function resolveStatus(item: DocumentListItem): string {
@@ -152,17 +153,68 @@ export default function ProcessingQueueScreen({ navigation }: ProcessingQueueScr
 
   const filteredDocuments = useMemo(() => {
     const normalizedUsername = username.toLowerCase();
+    const canIdentifyOwner = normalizedUsername.length > 0;
+
     return documents.filter((item) => {
       const status = resolveStatus(item);
       const creator = String(item.created_by_username || '').toLowerCase();
-      const isMine = normalizedUsername ? creator === normalizedUsername : false;
+      const hasCreator = creator.length > 0;
+      const isMine = canIdentifyOwner && creator === normalizedUsername;
 
-      if (activeTab === 'pending_approval') return status === 'pending';
-      if (activeTab === 'team_documents') return !!creator && !isMine;
-      if (!creator) return true;
+      if (activeTab === 'approval_request') {
+        // Requests pending for approval.
+        // If owner is not identifiable, fall back to all pending docs.
+        if (!canIdentifyOwner || !hasCreator) return status === 'pending';
+        return status === 'pending' && !isMine;
+      }
+
+      if (activeTab === 'approval_awaiting') {
+        // My uploads currently in approval workflow.
+        // If owner is not identifiable, show all docs with approval status.
+        if (!canIdentifyOwner || !hasCreator) return !!item.approval_status;
+        return isMine && !!item.approval_status;
+      }
+
+      // My Uploads
+      // If owner is not identifiable, show all docs to avoid empty dashboard.
+      if (!canIdentifyOwner || !hasCreator) return true;
       return isMine;
     });
   }, [activeTab, documents, username]);
+
+  const tabCounts = useMemo(() => {
+    const normalizedUsername = username.toLowerCase();
+    const canIdentifyOwner = normalizedUsername.length > 0;
+    let myUploads = 0;
+    let approvalRequest = 0;
+    let approvalAwaiting = 0;
+
+    for (const item of documents) {
+      const status = resolveStatus(item);
+      const creator = String(item.created_by_username || '').toLowerCase();
+      const hasCreator = creator.length > 0;
+      const isMine = canIdentifyOwner && creator === normalizedUsername;
+
+      if (!canIdentifyOwner || !hasCreator) {
+        myUploads += 1;
+        if (status === 'pending') approvalRequest += 1;
+        if (item.approval_status) approvalAwaiting += 1;
+        continue;
+      }
+
+      if (isMine) myUploads += 1;
+      if (status === 'pending' && !isMine) approvalRequest += 1;
+      if (isMine && !!item.approval_status) approvalAwaiting += 1;
+    }
+
+    const fallbackPending = stats?.pending ?? 0;
+
+    return {
+      my_uploads: myUploads,
+      approval_request: approvalRequest || fallbackPending,
+      approval_awaiting: approvalAwaiting,
+    } as const;
+  }, [documents, username, stats]);
 
   const openDocument = (item: DocumentListItem) => {
     if (item.approval_status == null && item.status) {
@@ -199,15 +251,15 @@ export default function ProcessingQueueScreen({ navigation }: ProcessingQueueScr
   };
 
   const emptyMessage = useMemo(() => {
-    if (activeTab === 'pending_approval') return 'No approvals pending right now.';
-    if (activeTab === 'team_documents') return 'No team documents to show yet.';
+    if (activeTab === 'approval_request') return 'No approval requests assigned right now.';
+    if (activeTab === 'approval_awaiting') return 'No documents are currently awaiting approval.';
     return 'No uploads yet. Start by uploading a document.';
   }, [activeTab]);
 
   const renderDocumentItem = ({ item }: { item: DocumentListItem }) => {
     const status = resolveStatus(item);
     const title = item.file_name || item.invoice_number || 'Document';
-    const showActions = activeTab === 'pending_approval' && status === 'pending';
+    const showActions = activeTab === 'approval_request' && status === 'pending';
 
     return (
       <DocumentCard
@@ -224,45 +276,52 @@ export default function ProcessingQueueScreen({ navigation }: ProcessingQueueScr
   };
 
   const handleChangeCompany = () => {
-    navigation.replace('CompanySelection');
+    navigation.navigate('CompanySelection');
+  };
+
+  const handleLogout = () => {
+    Alert.alert('Logout', 'Are you sure you want to logout?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Logout',
+        style: 'destructive',
+        onPress: async () => {
+          await authService.logout();
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'Login' }],
+          });
+        },
+      },
+    ]);
   };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <DashboardHeader
-        title="Documents"
+        title={companyName ? `Active Company: ${companyName}` : 'Active Company'}
         companyName={companyName}
         userLabel={username || 'User'}
         onChangeTenant={handleChangeCompany}
         onNotificationPress={() => Alert.alert('Notifications', 'No new notifications.')}
-        onProfilePress={() => Alert.alert('Profile', username || 'User profile')}
+        onProfilePress={() => undefined}
+        onOpenThemeSettings={() => navigation.navigate('ThemeSettings')}
+        onLogout={handleLogout}
       />
 
       <View style={styles.summaryCards}>
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryLabel}>Pending Approvals</Text>
-          <Text style={styles.summaryValue}>{stats?.pending ?? 0}</Text>
-        </View>
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryLabel}>Uploaded by Me</Text>
-          <Text style={styles.summaryValue}>{documents.filter((d) => (d.created_by_username || '').toLowerCase() === username.toLowerCase()).length}</Text>
-        </View>
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryLabel}>Team Documents</Text>
-          <Text style={styles.summaryValue}>{documents.filter((d) => !!d.created_by_username && (d.created_by_username || '').toLowerCase() !== username.toLowerCase()).length}</Text>
-        </View>
-      </View>
-
-      <View style={styles.tabsWrap}>
         {TABS.map((tab) => {
-          const selected = tab.key === activeTab;
+          const isActive = activeTab === tab.key;
+          const value = tabCounts[tab.key] ?? 0;
           return (
             <TouchableOpacity
-              key={tab.key}
-              style={[styles.tabBtn, selected && styles.tabBtnSelected]}
+              key={`summary-${tab.key}`}
+              style={[styles.summaryCard, isActive && styles.summaryCardActive]}
               onPress={() => setActiveTab(tab.key)}
+              activeOpacity={0.9}
             >
-              <Text style={[styles.tabLabel, selected && styles.tabLabelSelected]}>{tab.label}</Text>
+              <Text style={[styles.summaryLabel, isActive && styles.summaryLabelActive]}>{tab.label}</Text>
+              <Text style={[styles.summaryValue, isActive && styles.summaryValueActive]}>{value}</Text>
             </TouchableOpacity>
           );
         })}
@@ -282,16 +341,19 @@ export default function ProcessingQueueScreen({ navigation }: ProcessingQueueScr
             progressBackgroundColor={theme.colors.surface}
           />
         }
-        onEndReached={activeTab === 'my_uploads' ? loadMore : undefined}
+        onEndReached={loadMore}
         onEndReachedThreshold={0.4}
         ListFooterComponent={loadingMore ? <ActivityIndicator style={styles.loadingMore} color={theme.colors.primaryAccent} /> : null}
         ListEmptyComponent={
           !loading ? (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyTitle}>{emptyMessage}</Text>
-              <TouchableOpacity style={styles.emptyCta} onPress={() => navigation.navigate('UploadDocument')}>
-                <Text style={styles.emptyCtaText}>Upload document</Text>
-              </TouchableOpacity>
+              <AppButton
+                label="Upload document"
+                variant="primary"
+                onPress={() => navigation.navigate('UploadDocument')}
+                style={styles.emptyCta}
+              />
             </View>
           ) : null
         }
@@ -318,57 +380,46 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
     flexDirection: 'row',
     paddingHorizontal: theme.spacing[4],
     paddingTop: theme.spacing[3],
-    paddingBottom: theme.spacing[2] + 2,
+    paddingBottom: theme.spacing[3],
     gap: theme.spacing[2],
   },
   summaryCard: {
     flex: 1,
     backgroundColor: theme.colors.surface,
     borderRadius: theme.radius.lg,
-    paddingVertical: theme.spacing[2] + 2,
-    paddingHorizontal: theme.spacing[2] + 2,
+    paddingVertical: theme.spacing[3],
+    paddingHorizontal: theme.spacing[3],
     shadowColor: theme.colors.textPrimary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  summaryCardActive: {
+    backgroundColor: theme.colors.primaryAccent,
+    borderColor: theme.colors.primaryAccent,
+    borderWidth: 1,
   },
   summaryLabel: {
     color: theme.colors.textMuted,
     fontSize: theme.typography.size.xs,
     marginBottom: theme.spacing[1],
     fontFamily: theme.typography.fontFamilyPrimary,
+    textAlign: 'center',
+  },
+  summaryLabelActive: {
+    color: theme.colors.onPrimary,
   },
   summaryValue: {
     color: theme.colors.textPrimary,
-    fontSize: theme.typography.size.xl,
+    fontSize: theme.typography.size.lg,
     fontWeight: theme.typography.weight.bold,
     fontFamily: theme.typography.fontFamilyPrimary,
+    textAlign: 'center',
   },
-  tabsWrap: {
-    flexDirection: 'row',
-    paddingHorizontal: theme.spacing[4],
-    paddingTop: theme.spacing[2],
-    paddingBottom: theme.spacing[2] + 2,
-    gap: theme.spacing[2],
-  },
-  tabBtn: {
-    flex: 1,
-    borderRadius: theme.radius.pill,
-    paddingVertical: theme.spacing[2] + 2,
-    alignItems: 'center',
-    backgroundColor: theme.colors.surfaceElevated,
-  },
-  tabBtnSelected: {
-    backgroundColor: theme.colors.primaryAccent,
-  },
-  tabLabel: {
-    fontSize: theme.typography.size.xs,
-    fontWeight: theme.typography.weight.semibold,
-    color: theme.colors.textSecondary,
-    fontFamily: theme.typography.fontFamilyPrimary,
-  },
-  tabLabelSelected: {
+  summaryValueActive: {
     color: theme.colors.onPrimary,
   },
   listContainer: {
@@ -376,7 +427,7 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
     paddingBottom: 100,
   },
   emptyContainer: {
-    marginTop: theme.spacing[8] + theme.spacing[1],
+    marginTop: theme.spacing[10],
     alignItems: 'center',
   },
   emptyTitle: {
@@ -388,15 +439,7 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
     fontFamily: theme.typography.fontFamilyPrimary,
   },
   emptyCta: {
-    backgroundColor: theme.colors.primaryAccent,
-    paddingHorizontal: theme.spacing[4],
-    paddingVertical: theme.spacing[2] + 2,
-    borderRadius: theme.radius.md,
-  },
-  emptyCtaText: {
-    color: theme.colors.onPrimary,
-    fontWeight: theme.typography.weight.bold,
-    fontFamily: theme.typography.fontFamilyPrimary,
+    minWidth: 160,
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,

@@ -15,6 +15,7 @@ import CompanySelectionScreen from './src/screens/CompanySelectionScreen';
 import ProcessingQueueScreen from './src/screens/ProcessingQueueScreen';
 import DocumentDetailScreen from './src/screens/DocumentDetailScreen';
 import UploadDocumentScreen from './src/screens/UploadDocumentScreen';
+import ThemeSettingsScreen from './src/screens/ThemeSettingsScreen';
 import { ThemeProvider, useTheme } from './src/theme';
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -80,7 +81,8 @@ function AppNavigator() {
           <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
           <Stack.Screen name="CompanySelection" component={CompanySelectionScreen} options={{ headerShown: false }} />
           <Stack.Screen name="ProcessingQueue" component={ProcessingQueueScreen} options={{ headerShown: false }} />
-          <Stack.Screen name="UploadDocument" component={UploadDocumentScreen} options={{ title: 'Upload Document' }} />
+          <Stack.Screen name="ThemeSettings" component={ThemeSettingsScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="UploadDocument" component={UploadDocumentScreen} options={{ headerShown: false }} />
           <Stack.Screen name="DocumentDetail" component={DocumentDetailScreen} options={{ title: 'Document Details' }} />
         </Stack.Navigator>
       </NavigationContainer>

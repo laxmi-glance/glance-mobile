@@ -72,7 +72,7 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
     card: {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.radius.xl,
-    padding: theme.spacing[3] + 2,
+    padding: theme.spacing[4],
     marginBottom: theme.spacing[3],
     shadowColor: theme.colors.textPrimary,
     shadowOffset: { width: 0, height: 3 },
@@ -84,7 +84,7 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: theme.spacing[2] + 2,
+    marginBottom: theme.spacing[3],
   },
   titleWrap: {
     flexDirection: 'row',
@@ -113,30 +113,34 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
     flexDirection: 'row',
   },
   actionBtn: {
-    borderRadius: theme.radius.md,
+    minHeight: theme.button.height,
+    borderRadius: theme.button.radius,
+    borderWidth: 1,
     paddingHorizontal: theme.spacing[3],
-    paddingVertical: theme.spacing[2] + 1,
-    marginRight: theme.spacing[2] + 2,
+    justifyContent: 'center',
+    marginRight: theme.spacing[3],
   },
   actionBtnDisabled: {
     opacity: 0.5,
   },
   approveBtn: {
-    backgroundColor: theme.colors.statusApprovedBg,
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.success,
   },
   approveLabel: {
-    color: theme.colors.statusApprovedText,
-    fontWeight: theme.typography.weight.bold,
-    fontSize: theme.typography.size.sm,
+    color: theme.colors.success,
+    fontWeight: theme.button.fontWeight,
+    fontSize: theme.button.fontSize,
     fontFamily: theme.typography.fontFamilyPrimary,
   },
   rejectBtn: {
-    backgroundColor: theme.colors.statusRejectedBg,
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.error,
   },
   rejectLabel: {
-    color: theme.colors.statusRejectedText,
-    fontWeight: theme.typography.weight.bold,
-    fontSize: theme.typography.size.sm,
+    color: theme.colors.error,
+    fontWeight: theme.button.fontWeight,
+    fontSize: theme.button.fontSize,
     fontFamily: theme.typography.fontFamilyPrimary,
   },
   });

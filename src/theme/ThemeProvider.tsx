@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { useColorScheme } from 'react-native';
+import { AppState, useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import apiClient from '../config/api';
@@ -49,6 +49,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [mode, setModeState] = useState<ThemeMode>('auto');
   const [hydrated, setHydrated] = useState(false);
 
+  const syncModeFromServer = useCallback(async () => {
+    const serverMode = await fetchUserPreferredThemeMode();
+    if (!serverMode) return false;
+    setModeState(serverMode);
+    await AsyncStorage.setItem(STORAGE_KEY, serverMode);
+    return true;
+  }, []);
+
   useEffect(() => {
     (async () => {
       try {
@@ -56,16 +64,42 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         if (localMode === 'light' || localMode === 'dark' || localMode === 'auto') {
           setModeState(localMode);
         }
-        const serverMode = await fetchUserPreferredThemeMode();
-        if (serverMode) {
-          setModeState(serverMode);
-          await AsyncStorage.setItem(STORAGE_KEY, serverMode);
-        }
+        await syncModeFromServer();
       } finally {
         setHydrated(true);
       }
     })();
-  }, []);
+  }, [syncModeFromServer]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+
+    // If login finishes after initial mount, token may not exist during first sync.
+    // Do a few delayed retries so theme still gets sourced from personalization API.
+    let attempts = 0;
+    const maxAttempts = 8;
+    const retryMs = 1500;
+
+    const timer = setInterval(async () => {
+      attempts += 1;
+      const synced = await syncModeFromServer();
+      if (synced || attempts >= maxAttempts) {
+        clearInterval(timer);
+      }
+    }, retryMs);
+
+    return () => clearInterval(timer);
+  }, [hydrated, syncModeFromServer]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        void syncModeFromServer();
+      }
+    });
+    return () => subscription.remove();
+  }, [hydrated, syncModeFromServer]);
 
   const resolvedTheme: ThemeName = useMemo(() => resolveThemeName(mode, systemScheme), [mode, systemScheme]);
 

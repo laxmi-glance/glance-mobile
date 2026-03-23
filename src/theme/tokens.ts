@@ -71,14 +71,18 @@ export const elevation = {
 export const lightColors = {
   primary: '#4A4E8A',
   primaryAccent: '#3b82f6',
+  primaryAccentHover: '#2563eb',
+  primaryAccentActive: '#1d4ed8',
   secondary: '#667eea',
   background: '#ffffff',
   surface: '#ffffff',
   surfaceElevated: '#f9f9f9',
   surfaceMuted: '#f5f5f5',
   border: '#e0e0e0',
+  borderStrong: '#d1d5db',
   textPrimary: '#111827',
   textSecondary: '#1f2937',
+  textEmphasis: '#111827',
   textMuted: 'rgba(0, 0, 0, 0.45)',
   link: '#3366cc',
   success: '#52c41a',
@@ -101,14 +105,18 @@ export const lightColors = {
 export const darkColors = {
   primary: '#7c7fff',
   primaryAccent: '#818cf8',
+  primaryAccentHover: '#6366f1',
+  primaryAccentActive: '#4f46e5',
   secondary: '#a5b4fc',
   background: '#0f1117',
   surface: '#1a1d27',
   surfaceElevated: '#1e2130',
   surfaceMuted: '#1e2130',
   border: '#2c3044',
+  borderStrong: '#3a4058',
   textPrimary: '#d4d9e4',
   textSecondary: '#cbd5e1',
+  textEmphasis: '#e2e8f0',
   textMuted: '#94a3b8',
   link: '#94b7ff',
   success: '#22c55e',
@@ -148,6 +156,13 @@ export interface AppTheme {
   radius: typeof radius;
   elevation: typeof elevation;
   typography: typeof typography;
+  button: {
+    height: number;
+    radius: number;
+    fontSize: number;
+    fontWeight: typeof typography.weight.medium;
+    horizontalPadding: number;
+  };
 }
 
 export const lightTheme: AppTheme = {
@@ -157,6 +172,13 @@ export const lightTheme: AppTheme = {
   radius,
   elevation,
   typography,
+  button: {
+    height: 36,
+    radius: radius.xs,
+    fontSize: 15,
+    fontWeight: typography.weight.medium,
+    horizontalPadding: spacing[4],
+  },
 };
 
 export const darkTheme: AppTheme = {
@@ -166,4 +188,11 @@ export const darkTheme: AppTheme = {
   radius,
   elevation,
   typography,
+  button: {
+    height: 36,
+    radius: radius.xs,
+    fontSize: 15,
+    fontWeight: typography.weight.medium,
+    horizontalPadding: spacing[4],
+  },
 };

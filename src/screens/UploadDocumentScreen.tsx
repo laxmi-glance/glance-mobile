@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -15,14 +15,18 @@ import {
   Platform,
   Pressable,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import type { UploadDocumentScreenProps } from '../types/navigation';
 import documentService from '../services/document.service';
-import { DOCUMENT_TYPE_OPTIONS, type DocumentTypeValue, labelForDocumentType } from '../constants/documentTypes';
+import { type DocumentTypeValue } from '../constants/documentTypes';
 import { MAX_UPLOAD_BYTES, prepareImageForUpload } from '../utils/prepareImageForUpload';
 import { useTheme } from '../theme';
+import AppButton from '../components/common/AppButton';
 
 const SOFT_SIZE_BYTES = 5 * 1024 * 1024;
+
+type SelectOption = { value: string; label: string };
 
 export default function UploadDocumentScreen({ navigation }: UploadDocumentScreenProps) {
   const { theme } = useTheme();
@@ -31,10 +35,62 @@ export default function UploadDocumentScreen({ navigation }: UploadDocumentScree
   const [sizeBytes, setSizeBytes] = useState<number>(0);
   const [documentType, setDocumentType] = useState<DocumentTypeValue>('purchase_invoice');
   const [notes, setNotes] = useState('');
-  const [typeModalVisible, setTypeModalVisible] = useState(false);
+  const [paymentModalVisible, setPaymentModalVisible] = useState(false);
+  const [expenseModalVisible, setExpenseModalVisible] = useState(false);
+  const [expenseSearch, setExpenseSearch] = useState('');
+  const [ledgerLoading, setLedgerLoading] = useState(false);
+  const [paymentOptions, setPaymentOptions] = useState<SelectOption[]>([]);
+  const [expenseOptions, setExpenseOptions] = useState<SelectOption[]>([]);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<SelectOption | null>(null);
+  const [selectedExpenseHead, setSelectedExpenseHead] = useState<SelectOption | null>(null);
   const [preparing, setPreparing] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState<{ loaded: number; total: number } | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadLedgerOptions = async () => {
+      setLedgerLoading(true);
+      try {
+        const groups = await documentService.getLedgerAccountsByGroups();
+        if (!mounted) {
+          return;
+        }
+
+        const bankAccounts =
+          groups.find((group) => group.label?.toLowerCase() === 'bank accounts')?.options ?? [];
+        const expenseAccounts =
+          groups.find((group) => group.label?.toLowerCase() === 'expense')?.options ?? [];
+
+        setPaymentOptions(
+          bankAccounts.map((account) => ({
+            value: String(account.id),
+            label: account.title,
+          }))
+        );
+        setExpenseOptions(
+          expenseAccounts.map((account) => ({
+            value: String(account.id),
+            label: `${account.title}${account.statutory_code ? ` (${account.statutory_code})` : ''}`,
+          }))
+        );
+      } catch {
+        if (mounted) {
+          Alert.alert('Unable to load options', 'Payment method and expense head options could not be loaded.');
+        }
+      } finally {
+        if (mounted) {
+          setLedgerLoading(false);
+        }
+      }
+    };
+
+    loadLedgerOptions();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const resetImage = () => {
     setPreparedUri(null);
@@ -116,6 +172,8 @@ export default function UploadDocumentScreen({ navigation }: UploadDocumentScree
         {
           documentType,
           notes: notes.trim() || undefined,
+          paymentMethodId: selectedPaymentMethod?.value,
+          expenseHeadId: selectedExpenseHead?.value,
         },
         (p) => setProgress(p)
       );
@@ -170,45 +228,46 @@ export default function UploadDocumentScreen({ navigation }: UploadDocumentScree
     }
   };
 
-  const renderTypeRow = useCallback(
-    ({ item }: { item: (typeof DOCUMENT_TYPE_OPTIONS)[number] }) => (
-      <TouchableOpacity
-        style={styles.typeRow}
-        onPress={() => {
-          setDocumentType(item.value);
-          setTypeModalVisible(false);
-        }}
-      >
-        <Text style={styles.typeRowText}>{item.label}</Text>
-        {documentType === item.value ? <Text style={styles.typeCheck}>✓</Text> : null}
-      </TouchableOpacity>
-    ),
-    [documentType]
-  );
+  const filteredExpenseOptions = useMemo(() => {
+    const search = expenseSearch.trim().toLowerCase();
+    if (!search) {
+      return expenseOptions;
+    }
+    return expenseOptions.filter((item) => item.label.toLowerCase().includes(search));
+  }, [expenseOptions, expenseSearch]);
 
   const progressPct =
     progress && progress.total > 0 ? Math.round((100 * progress.loaded) / progress.total) : null;
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        <Text style={styles.hint}>Capture or pick one image. It is resized and compressed before upload (max{' '}
-        {MAX_UPLOAD_BYTES / (1024 * 1024)} MB).</Text>
+    <SafeAreaView style={styles.flex} edges={['top']}>
+      <View style={styles.header}>
+        <AppButton label="Back" variant="outline" onPress={() => navigation.goBack()} style={styles.backButton} />
+        <Text style={styles.title}>Upload Document</Text>
+      </View>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+          <Text style={styles.hint}>Capture or pick one image. It is resized and compressed before upload (max{' '}
+          {MAX_UPLOAD_BYTES / (1024 * 1024)} MB).</Text>
 
         <View style={styles.actionsRow}>
-          <TouchableOpacity
-            style={[styles.secondaryBtn, styles.secondaryBtnSpacing]}
+          <AppButton
+            label="Camera"
+            variant="outline"
             onPress={takePhoto}
             disabled={preparing || uploading}
-          >
-            <Text style={styles.secondaryBtnText}>Camera</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.secondaryBtn} onPress={pickFromLibrary} disabled={preparing || uploading}>
-            <Text style={styles.secondaryBtnText}>Gallery</Text>
-          </TouchableOpacity>
+            style={[styles.secondaryBtn, styles.secondaryBtnSpacing]}
+          />
+          <AppButton
+            label="Gallery"
+            variant="outline"
+            onPress={pickFromLibrary}
+            disabled={preparing || uploading}
+            style={styles.secondaryBtn}
+          />
         </View>
 
         {preparing ? (
@@ -230,14 +289,36 @@ export default function UploadDocumentScreen({ navigation }: UploadDocumentScree
           </View>
         ) : null}
 
-        <Text style={styles.label}>Document type</Text>
+        <Text style={styles.label}>Payment Method (Optional)</Text>
         <TouchableOpacity
           style={styles.selectField}
-          onPress={() => setTypeModalVisible(true)}
-          disabled={uploading}
+          onPress={() => setPaymentModalVisible(true)}
+          disabled={uploading || ledgerLoading}
         >
-          <Text style={styles.selectValue}>{labelForDocumentType(documentType)}</Text>
-          <Text style={styles.chevron}>▼</Text>
+          <Text style={[styles.selectValue, !selectedPaymentMethod ? styles.selectPlaceholder : null]}>
+            {selectedPaymentMethod?.label ?? 'Select payment method...'}
+          </Text>
+          {ledgerLoading ? (
+            <ActivityIndicator size="small" color={theme.colors.primaryAccent} />
+          ) : (
+            <Text style={styles.chevron}>▼</Text>
+          )}
+        </TouchableOpacity>
+
+        <Text style={styles.label}>Expense Head (Optional)</Text>
+        <TouchableOpacity
+          style={styles.selectField}
+          onPress={() => setExpenseModalVisible(true)}
+          disabled={uploading || ledgerLoading}
+        >
+          <Text style={[styles.selectValue, !selectedExpenseHead ? styles.selectPlaceholder : null]}>
+            {selectedExpenseHead?.label ?? 'Search and select expense head...'}
+          </Text>
+          {ledgerLoading ? (
+            <ActivityIndicator size="small" color={theme.colors.primaryAccent} />
+          ) : (
+            <Text style={styles.chevron}>▼</Text>
+          )}
         </TouchableOpacity>
 
         <Text style={styles.label}>Notes (optional)</Text>
@@ -255,39 +336,128 @@ export default function UploadDocumentScreen({ navigation }: UploadDocumentScree
           <Text style={styles.progressText}>Uploading… {progressPct}%</Text>
         ) : null}
 
-        <TouchableOpacity
-          style={[styles.primaryBtn, (!preparedUri || uploading) && styles.primaryBtnDisabled]}
-          onPress={submit}
-          disabled={!preparedUri || uploading}
-        >
-          {uploading ? (
-            <ActivityIndicator color={theme.colors.onPrimary} />
-          ) : (
-            <Text style={styles.primaryBtnText}>Upload document</Text>
-          )}
-        </TouchableOpacity>
-      </ScrollView>
+          <AppButton
+            label="Upload document"
+            variant="primary"
+            onPress={submit}
+            loading={uploading}
+            disabled={!preparedUri || uploading}
+            style={styles.primaryBtn}
+          />
+        </ScrollView>
 
-      <Modal visible={typeModalVisible} animationType="slide" transparent>
-        <View style={styles.modalRoot}>
-          <Pressable style={styles.modalBackdrop} onPress={() => setTypeModalVisible(false)} />
-          <View style={styles.modalSheet}>
-            <Text style={styles.modalTitle}>Document type</Text>
-            <FlatList
-              data={[...DOCUMENT_TYPE_OPTIONS]}
-              keyExtractor={(i) => i.value}
-              renderItem={renderTypeRow}
-            />
+        <Modal visible={paymentModalVisible} animationType="slide" transparent>
+          <View style={styles.modalRoot}>
+            <Pressable style={styles.modalBackdrop} onPress={() => setPaymentModalVisible(false)} />
+            <View style={styles.modalSheet}>
+              <Text style={styles.modalTitle}>Payment Method (Optional)</Text>
+              <TouchableOpacity
+                style={styles.typeRow}
+                onPress={() => {
+                  setSelectedPaymentMethod(null);
+                  setPaymentModalVisible(false);
+                }}
+              >
+                <Text style={[styles.typeRowText, styles.selectPlaceholder]}>None</Text>
+                {!selectedPaymentMethod ? <Text style={styles.typeCheck}>✓</Text> : null}
+              </TouchableOpacity>
+              <FlatList
+                data={paymentOptions}
+                keyExtractor={(item) => item.value}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.typeRow}
+                    onPress={() => {
+                      setSelectedPaymentMethod(item);
+                      setPaymentModalVisible(false);
+                    }}
+                  >
+                    <Text style={styles.typeRowText}>{item.label}</Text>
+                    {selectedPaymentMethod?.value === item.value ? <Text style={styles.typeCheck}>✓</Text> : null}
+                  </TouchableOpacity>
+                )}
+              />
+            </View>
           </View>
-        </View>
-      </Modal>
-    </KeyboardAvoidingView>
+        </Modal>
+
+        <Modal visible={expenseModalVisible} animationType="slide" transparent>
+          <View style={styles.modalRoot}>
+            <Pressable
+              style={styles.modalBackdrop}
+              onPress={() => {
+                setExpenseModalVisible(false);
+                setExpenseSearch('');
+              }}
+            />
+            <View style={styles.modalSheet}>
+              <Text style={styles.modalTitle}>Expense Head (Optional)</Text>
+              <TextInput
+                value={expenseSearch}
+                onChangeText={setExpenseSearch}
+                placeholder="Search and select expense head..."
+                placeholderTextColor={theme.colors.textMuted}
+                style={styles.searchInput}
+              />
+              <TouchableOpacity
+                style={styles.typeRow}
+                onPress={() => {
+                  setSelectedExpenseHead(null);
+                  setExpenseSearch('');
+                  setExpenseModalVisible(false);
+                }}
+              >
+                <Text style={[styles.typeRowText, styles.selectPlaceholder]}>None</Text>
+                {!selectedExpenseHead ? <Text style={styles.typeCheck}>✓</Text> : null}
+              </TouchableOpacity>
+              <FlatList
+                data={filteredExpenseOptions}
+                keyExtractor={(item) => item.value}
+                keyboardShouldPersistTaps="handled"
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.typeRow}
+                    onPress={() => {
+                      setSelectedExpenseHead(item);
+                      setExpenseSearch('');
+                      setExpenseModalVisible(false);
+                    }}
+                  >
+                    <Text style={styles.typeRowText}>{item.label}</Text>
+                    {selectedExpenseHead?.value === item.value ? <Text style={styles.typeCheck}>✓</Text> : null}
+                  </TouchableOpacity>
+                )}
+              />
+            </View>
+          </View>
+        </Modal>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
   StyleSheet.create({
     flex: { flex: 1, backgroundColor: theme.colors.surfaceMuted },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: theme.spacing[4],
+      paddingVertical: theme.spacing[3],
+      backgroundColor: theme.colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    backButton: {
+      marginRight: theme.spacing[3],
+      minWidth: 84,
+    },
+    title: {
+      fontSize: theme.typography.size.lg,
+      fontWeight: theme.typography.weight.semibold,
+      color: theme.colors.textPrimary,
+      fontFamily: theme.typography.fontFamilyPrimary,
+    },
     scroll: { padding: theme.spacing[4], paddingBottom: theme.spacing[8] },
     hint: {
       fontSize: theme.typography.size.small,
@@ -302,19 +472,7 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
   },
   secondaryBtn: {
     flex: 1,
-    paddingVertical: theme.spacing[3],
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.primaryAccent,
-    alignItems: 'center',
   },
-    secondaryBtnText: {
-      color: theme.colors.primaryAccent,
-      fontWeight: theme.typography.weight.semibold,
-      fontSize: theme.typography.size.body,
-      fontFamily: theme.typography.fontFamilyPrimary,
-    },
     centerPad: { alignItems: 'center', paddingVertical: theme.spacing[4] },
     muted: {
       marginTop: theme.spacing[2],
@@ -335,7 +493,7 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
       fontFamily: theme.typography.fontFamilyPrimary,
     },
     clearLink: {
-      marginTop: theme.spacing[1] + 2,
+      marginTop: theme.spacing[2],
       color: theme.colors.error,
       fontSize: theme.typography.size.md,
       fontFamily: theme.typography.fontFamilyPrimary,
@@ -353,8 +511,8 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
     justifyContent: 'space-between',
     backgroundColor: theme.colors.surface,
     borderRadius: theme.radius.md,
-    paddingHorizontal: theme.spacing[3] + 2,
-    paddingVertical: theme.spacing[3] + 2,
+    paddingHorizontal: theme.spacing[4],
+    paddingVertical: theme.spacing[4],
     marginBottom: theme.spacing[4],
     borderWidth: 1,
     borderColor: theme.colors.border,
@@ -364,6 +522,9 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
       color: theme.colors.textPrimary,
       flex: 1,
       fontFamily: theme.typography.fontFamilyPrimary,
+    },
+    selectPlaceholder: {
+      color: theme.colors.textMuted,
     },
     chevron: { fontSize: theme.typography.size.xs, color: theme.colors.textMuted },
   notes: {
@@ -390,18 +551,8 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
       fontFamily: theme.typography.fontFamilyPrimary,
     },
   primaryBtn: {
-    backgroundColor: theme.colors.primaryAccent,
-    paddingVertical: theme.spacing[4],
-    borderRadius: theme.radius.lg,
-    alignItems: 'center',
+    minHeight: 44,
   },
-  primaryBtnDisabled: { opacity: 0.45 },
-    primaryBtnText: {
-      color: theme.colors.onPrimary,
-      fontSize: theme.typography.size.lg,
-      fontWeight: theme.typography.weight.semibold,
-      fontFamily: theme.typography.fontFamilyPrimary,
-    },
   modalRoot: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -426,12 +577,25 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamilyPrimary,
   },
+  searchInput: {
+    minHeight: 42,
+    marginHorizontal: theme.spacing[4],
+    marginVertical: theme.spacing[3],
+    backgroundColor: theme.colors.surfaceMuted,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    paddingHorizontal: theme.spacing[3],
+    color: theme.colors.textPrimary,
+    fontSize: theme.typography.size.body,
+    fontFamily: theme.typography.fontFamilyPrimary,
+  },
   typeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: theme.spacing[4],
-    paddingVertical: theme.spacing[3] + 2,
+    paddingVertical: theme.spacing[4],
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
