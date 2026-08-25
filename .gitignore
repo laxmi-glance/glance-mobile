@@ -2,6 +2,8 @@
 
 # dependencies
 node_modules/
+.pnpm-store/
+**/.pnpm-store/
 
 # Expo
 .expo/
@@ -23,8 +25,10 @@ expo-env.d.ts
 
 # debug
 npm-debug.*
+pnpm-debug.log*
 yarn-debug.*
 yarn-error.*
+package-lock.json
 
 # macOS
 .DS_Store

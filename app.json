@@ -10,26 +10,41 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#13003E"
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.glancewise.mobile"
+      "bundleIdentifier": "com.glancewise.mobile",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Glancewise uses the camera to capture invoices and receipts.",
+        "NSPhotoLibraryUsageDescription": "Glancewise uses your photo library to upload invoices and receipts."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#13003E"
       },
       "package": "com.glancewise.mobile",
-      "permissions": [
-        "android.permission.INTERNET"
-      ],
+      "permissions": ["android.permission.INTERNET", "android.permission.CAMERA"],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Glancewise uses the camera to capture invoices and receipts.",
+          "photosPermission": "Glancewise uses your photo library to upload invoices and receipts."
+        }
+      ],
+      "expo-document-picker"
+    ],
+    "extra": {
+      "apiBaseUrl": ""
     }
   }
 }

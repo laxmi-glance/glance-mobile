@@ -1,53 +1,59 @@
-import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ActivityIndicator,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
-} from 'react-native';
-import { DocumentDetailScreenProps } from '../types/navigation';
-import documentService, { Document } from '../services/document.service';
+import React, { useCallback, useEffect, useState } from "react";
+import { View, Text, StyleSheet, ActivityIndicator, ScrollView, Alert } from "react-native";
+import { DocumentDetailScreenProps } from "../types/navigation";
+import documentService from "../services/document.service";
+import type { PreprocessingDocument } from "../types/models";
+import StatusBadge from "../components/StatusBadge";
+import Card from "../components/Card";
+import Button from "../components/Button";
+import { formatDateTime, formatDurationSeconds } from "../utils/dates";
+import { canRetry, statusTone } from "../utils/documentStatus";
+import { apiErrorMessage } from "../utils/errors";
+import { colors, space } from "../theme";
 
 export default function DocumentDetailScreen({ route, navigation }: DocumentDetailScreenProps) {
   const { documentId } = route.params;
-  const [document, setDocument] = useState<Document | null>(null);
+  const [document, setDocument] = useState<PreprocessingDocument | null>(null);
   const [loading, setLoading] = useState(true);
   const [retrying, setRetrying] = useState(false);
 
+  const loadDocument = useCallback(
+    async (goBackOnError = true) => {
+      try {
+        const data = await documentService.getDocumentDetail(documentId);
+        setDocument(data);
+      } catch (error: unknown) {
+        Alert.alert("Could not load document", apiErrorMessage(error));
+        if (goBackOnError) {
+          navigation.goBack();
+        }
+      } finally {
+        setLoading(false);
+      }
+    },
+    [documentId, navigation]
+  );
+
   useEffect(() => {
-    loadDocumentDetail();
-  }, [documentId]);
+    void loadDocument();
+  }, [loadDocument]);
 
-  const loadDocumentDetail = async () => {
-    try {
-      const data = await documentService.getDocumentDetail(documentId);
-      setDocument(data);
-    } catch (error: any) {
-      Alert.alert('Error', 'Failed to load document details.');
-      navigation.goBack();
-    } finally {
-      setLoading(false);
+  const handleRetry = () => {
+    if (!document) {
+      return;
     }
-  };
-
-  const handleRetry = async () => {
-    if (!document) return;
-
-    Alert.alert('Retry Processing', 'Are you sure you want to retry processing this document?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert("Retry processing", "Queue this document to run through OCR again?", [
+      { text: "Cancel", style: "cancel" },
       {
-        text: 'Retry',
+        text: "Retry",
         onPress: async () => {
           setRetrying(true);
           try {
-            const updatedDoc = await documentService.retryDocument(document.id);
-            setDocument(updatedDoc);
-            Alert.alert('Success', 'Document queued for reprocessing');
-          } catch (error: any) {
-            Alert.alert('Error', 'Failed to retry document processing');
+            const result = await documentService.retryDocument(document.id);
+            Alert.alert("Queued", result.message || "Document queued for reprocessing.");
+            await loadDocument(false);
+          } catch (error: unknown) {
+            Alert.alert("Retry failed", apiErrorMessage(error));
           } finally {
             setRetrying(false);
           }
@@ -56,37 +62,10 @@ export default function DocumentDetailScreen({ route, navigation }: DocumentDeta
     ]);
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return '#34C759';
-      case 'processing':
-        return '#007AFF';
-      case 'failed':
-        return '#FF3B30';
-      case 'pending':
-        return '#FF9500';
-      default:
-        return '#8E8E93';
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
-  };
-
-  const formatFileSize = (bytes?: number) => {
-    if (!bytes) return 'Unknown';
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
-  };
-
   if (loading) {
     return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color={colors.brand} />
       </View>
     );
   }
@@ -95,132 +74,158 @@ export default function DocumentDetailScreen({ route, navigation }: DocumentDeta
     return null;
   }
 
+  const issueText = document.exception_log || document.error_log;
+  const processedDocumentId = document.financial_document?.id;
+
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <Card style={styles.headerCard}>
         <Text style={styles.fileName}>{document.file_name}</Text>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(document.status) }]}>
-          <Text style={styles.statusText}>{document.status.toUpperCase()}</Text>
+        <View style={styles.badgeRow}>
+          <StatusBadge label={document.processing_status_display} tone={statusTone(document)} />
         </View>
-      </View>
+      </Card>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Document Information</Text>
-        
-        <View style={styles.infoRow}>
-          <Text style={styles.label}>File Type:</Text>
-          <Text style={styles.value}>{document.file_type || 'N/A'}</Text>
-        </View>
+      <Card style={styles.section}>
+        <Text style={styles.sectionTitle}>Details</Text>
+        <InfoRow label="Type" value={document.document_type || "—"} />
+        <InfoRow label="Uploaded" value={formatDateTime(document.created_on)} />
+        <InfoRow label="Uploaded by" value={document.created_by || "—"} />
+        <InfoRow label="Started" value={formatDateTime(document.processing_started_at)} />
+        <InfoRow label="Validation" value={document.validation_status || "—"} />
+        <InfoRow label="Failures" value={String(document.failure_count ?? 0)} />
+        <InfoRow label="OCR time" value={formatDurationSeconds(document.ocr_duration_seconds)} />
+        <InfoRow
+          label="Total time"
+          value={formatDurationSeconds(document.total_processing_duration_seconds)}
+        />
+      </Card>
 
-        <View style={styles.infoRow}>
-          <Text style={styles.label}>File Size:</Text>
-          <Text style={styles.value}>{formatFileSize(document.file_size)}</Text>
-        </View>
+      {document.financial_document ? (
+        <Card style={styles.section}>
+          <Text style={styles.sectionTitle}>Linked invoice</Text>
+          <InfoRow label="Number" value={document.financial_document.invoice_number || "—"} />
+          <InfoRow label="Date" value={document.financial_document.invoice_date || "—"} />
+          <InfoRow
+            label="Total"
+            value={
+              document.financial_document.total != null
+                ? String(document.financial_document.total)
+                : "—"
+            }
+          />
+          <InfoRow label="Approval" value={document.financial_document.approval_status || "—"} />
+        </Card>
+      ) : null}
 
-        <View style={styles.infoRow}>
-          <Text style={styles.label}>Uploaded:</Text>
-          <Text style={styles.value}>{formatDate(document.uploaded_at)}</Text>
-        </View>
+      {document.duplicate_of ? (
+        <Card style={styles.section}>
+          <Text style={styles.sectionTitle}>Duplicate of</Text>
+          <InfoRow label="File" value={document.duplicate_of.file_name || "—"} />
+          <InfoRow label="Invoice" value={document.duplicate_of.invoice_number || "—"} />
+        </Card>
+      ) : null}
 
-        {document.processed_at && (
-          <View style={styles.infoRow}>
-            <Text style={styles.label}>Processed:</Text>
-            <Text style={styles.value}>{formatDate(document.processed_at)}</Text>
-          </View>
-        )}
-      </View>
+      {issueText ? (
+        <Card style={styles.section}>
+          <Text style={styles.sectionTitle}>Issue</Text>
+          <Text style={styles.issue}>{issueText}</Text>
+        </Card>
+      ) : null}
 
-      {document.status === 'failed' && (
-        <View style={styles.section}>
-          <TouchableOpacity
-            style={[styles.retryButton, retrying && styles.retryButtonDisabled]}
-            onPress={handleRetry}
-            disabled={retrying}
-          >
-            {retrying ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.retryButtonText}>Retry Processing</Text>
-            )}
-          </TouchableOpacity>
-        </View>
-      )}
+      {processedDocumentId ? (
+        <Button
+          label="View details"
+          variant="secondary"
+          icon="receipt-outline"
+          onPress={() => navigation.navigate("ApDocument", { documentId: processedDocumentId })}
+          style={styles.action}
+        />
+      ) : null}
+
+      {canRetry(document) ? (
+        <Button
+          label="Retry processing"
+          icon="refresh-outline"
+          onPress={handleRetry}
+          loading={retrying}
+          style={styles.action}
+        />
+      ) : null}
     </ScrollView>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.row}>
+      <Text style={styles.label}>{label}</Text>
+      <Text style={styles.value}>{value}</Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.background,
   },
-  centerContainer: {
+  content: {
+    padding: space.lg,
+    paddingBottom: 40,
+  },
+  center: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: colors.background,
   },
-  header: {
-    backgroundColor: '#fff',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+  headerCard: {
+    marginBottom: space.md,
   },
   fileName: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 12,
+    fontWeight: "700",
+    color: colors.textHeading,
   },
-  statusBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  statusText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
+  badgeRow: {
+    marginTop: space.md,
+    flexDirection: "row",
   },
   section: {
-    backgroundColor: '#fff',
-    marginTop: 16,
-    padding: 20,
+    marginBottom: space.md,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 16,
+    fontSize: 16,
+    fontWeight: "700",
+    color: colors.textHeading,
+    marginBottom: space.sm,
   },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
+  row: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: space.lg,
+    paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: colors.border,
   },
   label: {
-    fontSize: 15,
-    color: '#666',
+    fontSize: 14,
+    color: colors.textSecondary,
   },
   value: {
-    fontSize: 15,
-    color: '#333',
-    fontWeight: '500',
+    flex: 1,
+    fontSize: 14,
+    color: colors.text,
+    fontWeight: "500",
+    textAlign: "right",
   },
-  retryButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
-    paddingVertical: 14,
-    alignItems: 'center',
+  issue: {
+    fontSize: 14,
+    color: colors.danger,
+    lineHeight: 20,
   },
-  retryButtonDisabled: {
-    opacity: 0.6,
-  },
-  retryButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+  action: {
+    marginTop: space.sm,
   },
 });

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -8,251 +8,312 @@ import {
   RefreshControl,
   TouchableOpacity,
   Alert,
-} from 'react-native';
-import { ProcessingQueueScreenProps } from '../types/navigation';
-import documentService, { Document } from '../services/document.service';
-import companyService from '../services/company.service';
+  TextInput,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { QueueScreenProps } from "../types/navigation";
+import documentService from "../services/document.service";
+import tenantService from "../services/tenant.service";
+import type { PreprocessingDocument, QueueStats, QueueSummaryStatus } from "../types/models";
+import DocumentRow from "../components/DocumentRow";
+import EmptyState from "../components/EmptyState";
+import Screen from "../components/Screen";
+import Button from "../components/Button";
+import { apiErrorMessage } from "../utils/errors";
+import { useDocumentUpload } from "../hooks/useDocumentUpload";
+import { mergeUniqueById } from "../utils/lists";
+import { colors, radius, space } from "../theme";
 
-export default function ProcessingQueueScreen({ navigation }: ProcessingQueueScreenProps) {
-  const [documents, setDocuments] = useState<Document[]>([]);
+const FILTERS: { label: string; value?: QueueSummaryStatus }[] = [
+  { label: "All" },
+  { label: "Processing", value: "processing" },
+  { label: "Completed", value: "completed" },
+  { label: "Issues", value: "failed" },
+];
+
+export default function ProcessingQueueScreen({ navigation }: QueueScreenProps) {
+  const [documents, setDocuments] = useState<PreprocessingDocument[]>([]);
+  const [stats, setStats] = useState<QueueStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  const [companyName, setCompanyName] = useState('');
+  const [companyName, setCompanyName] = useState("");
+  const [search, setSearch] = useState("");
+  const [summaryStatus, setSummaryStatus] = useState<QueueSummaryStatus | undefined>();
+  const searchRef = useRef(search);
+  searchRef.current = search;
 
-  useEffect(() => {
-    loadCompanyInfo();
-    loadDocuments();
+  const loadCompanyInfo = useCallback(async () => {
+    const tenant = await tenantService.getSelectedTenant();
+    if (tenant) {
+      setCompanyName(tenant.company_name);
+    }
   }, []);
 
-  const loadCompanyInfo = async () => {
-    const company = await companyService.getSelectedCompany();
-    if (company) {
-      setCompanyName(company.name);
-    }
-  };
+  const loadDocuments = useCallback(
+    async (pageNum = 1, replace = false) => {
+      try {
+        const [queue, queueStats] = await Promise.all([
+          documentService.getProcessingQueue({
+            page: pageNum,
+            search: searchRef.current.trim() || undefined,
+            summary_status: summaryStatus,
+          }),
+          pageNum === 1 ? documentService.getQueueStats() : Promise.resolve(null),
+        ]);
 
-  const loadDocuments = async (pageNum: number = 1) => {
-    try {
-      const response = await documentService.getProcessingQueue({ page: pageNum });
-      
-      if (pageNum === 1) {
-        setDocuments(response.results);
-      } else {
-        setDocuments(prev => [...prev, ...response.results]);
+        setDocuments((prev) => mergeUniqueById(prev, queue.results, replace || pageNum === 1));
+        setHasMore(Boolean(queue.next));
+        setPage(pageNum);
+        if (queueStats) {
+          setStats(queueStats);
+        }
+      } catch (error: unknown) {
+        Alert.alert("Could not load queue", apiErrorMessage(error));
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+        setLoadingMore(false);
       }
-      
-      setHasMore(!!response.next);
-      setPage(pageNum);
-    } catch (error: any) {
-      Alert.alert('Error', 'Failed to load documents. Please try again.');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+    },
+    [summaryStatus]
+  );
+
+  const { uploading, upload } = useDocumentUpload(() => {
+    void loadDocuments(1, true);
+  });
+
+  useEffect(() => {
+    void loadCompanyInfo();
+  }, [loadCompanyInfo]);
+
+  useEffect(() => {
+    setLoading(true);
+    void loadDocuments(1, true);
+  }, [loadDocuments]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    loadDocuments(1);
-  }, []);
+    void loadDocuments(1, true);
+  }, [loadDocuments]);
 
   const loadMore = () => {
-    if (!loading && hasMore) {
-      setLoading(true);
-      loadDocuments(page + 1);
+    if (loading || loadingMore || refreshing || !hasMore) {
+      return;
     }
+    setLoadingMore(true);
+    loadDocuments(page + 1);
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return '#34C759';
-      case 'processing':
-        return '#007AFF';
-      case 'failed':
-        return '#FF3B30';
-      case 'pending':
-        return '#FF9500';
-      default:
-        return '#8E8E93';
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    });
-  };
-
-  const renderDocumentItem = ({ item }: { item: Document }) => (
-    <TouchableOpacity
-      style={styles.documentCard}
-      onPress={() => navigation.navigate('DocumentDetail', { documentId: item.id })}
-    >
-      <View style={styles.documentHeader}>
-        <Text style={styles.fileName} numberOfLines={1}>
-          {item.file_name}
-        </Text>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-          <Text style={styles.statusText}>{item.status.toUpperCase()}</Text>
-        </View>
-      </View>
-      
-      <Text style={styles.dateText}>
-        Uploaded: {formatDate(item.uploaded_at)}
-      </Text>
-      
-      {item.processed_at && (
-        <Text style={styles.dateText}>
-          Processed: {formatDate(item.processed_at)}
-        </Text>
-      )}
-    </TouchableOpacity>
-  );
-
-  const handleChangeCompany = () => {
-    navigation.replace('CompanySelection');
+  const handleSearch = () => {
+    setLoading(true);
+    loadDocuments(1, true);
   };
 
   return (
-    <View style={styles.container}>
+    <Screen>
       <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Processing Queue</Text>
-          <Text style={styles.companyText}>{companyName}</Text>
+        <View style={styles.headerText}>
+          <Text style={styles.title}>Processing queue</Text>
+          <Text style={styles.company}>{companyName}</Text>
         </View>
-        <TouchableOpacity onPress={handleChangeCompany} style={styles.changeButton}>
-          <Text style={styles.changeButtonText}>Change</Text>
-        </TouchableOpacity>
+        <Button
+          label="Upload"
+          icon="cloud-upload-outline"
+          onPress={upload}
+          loading={uploading}
+          style={styles.uploadBtn}
+        />
+      </View>
+
+      {stats ? (
+        <View style={styles.statsRow}>
+          <StatChip label="Total" value={stats.total} />
+          <StatChip label="In progress" value={stats.processing} />
+          <StatChip label="Done" value={stats.completed} />
+          <StatChip label="Issues" value={stats.failed} accent={stats.failed > 0} />
+        </View>
+      ) : null}
+
+      <View style={styles.searchRow}>
+        <Ionicons name="search" size={16} color={colors.textMuted} />
+        <TextInput
+          style={styles.search}
+          placeholder="Search file name"
+          placeholderTextColor={colors.textMuted}
+          value={search}
+          onChangeText={setSearch}
+          returnKeyType="search"
+          onSubmitEditing={handleSearch}
+        />
+      </View>
+
+      <View style={styles.filters}>
+        {FILTERS.map((filter) => {
+          const active = summaryStatus === filter.value;
+          return (
+            <TouchableOpacity
+              key={filter.label}
+              style={[styles.filterChip, active && styles.filterChipActive]}
+              onPress={() => setSummaryStatus(filter.value)}
+            >
+              <Text style={[styles.filterText, active && styles.filterTextActive]}>
+                {filter.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       <FlatList
         data={documents}
-        renderItem={renderDocumentItem}
-        keyExtractor={(item) => item.id.toString()}
-        contentContainerStyle={styles.listContainer}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
+        renderItem={({ item }) => (
+          <DocumentRow
+            item={item}
+            onPress={() => navigation.navigate("DocumentDetail", { documentId: item.id })}
+          />
+        )}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.list}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         onEndReached={loadMore}
-        onEndReachedThreshold={0.5}
-        ListFooterComponent={
-          loading && page > 1 ? (
-            <ActivityIndicator style={styles.loadingMore} />
-          ) : null
-        }
+        onEndReachedThreshold={0.4}
+        ListFooterComponent={loadingMore ? <ActivityIndicator style={styles.loadingMore} /> : null}
         ListEmptyComponent={
           !loading ? (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No documents found</Text>
-            </View>
+            <EmptyState
+              title="No documents in this queue"
+              hint="Capture a receipt or upload a PDF to get started."
+            />
           ) : null
         }
       />
 
-      {loading && page === 1 && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color="#007AFF" />
+      {loading && page === 1 ? (
+        <View style={styles.overlay}>
+          <ActivityIndicator size="large" color={colors.brand} />
         </View>
-      )}
+      ) : null}
+    </Screen>
+  );
+}
+
+function StatChip({ label, value, accent }: { label: string; value: number; accent?: boolean }) {
+  return (
+    <View style={styles.statChip}>
+      <Text style={[styles.statValue, accent && { color: colors.danger }]}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: space.xl,
+    paddingVertical: space.md,
+    gap: space.md,
+  },
+  headerText: {
+    flex: 1,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: 22,
+    fontWeight: "700",
+    color: colors.textHeading,
   },
-  companyText: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
+  company: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginTop: 2,
   },
-  changeButton: {
+  uploadBtn: {
+    minHeight: 40,
+    paddingHorizontal: 14,
+  },
+  statsRow: {
+    flexDirection: "row",
+    paddingHorizontal: space.lg,
+    gap: space.sm,
+  },
+  statChip: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: colors.text,
+  },
+  statLabel: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  searchRow: {
+    marginHorizontal: space.lg,
+    marginTop: space.md,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  search: {
+    flex: 1,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: colors.text,
+  },
+  filters: {
+    flexDirection: "row",
+    paddingHorizontal: space.lg,
+    paddingVertical: space.md,
+    gap: space.sm,
+  },
+  filterChip: {
     paddingHorizontal: 12,
     paddingVertical: 6,
+    borderRadius: radius.full,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  changeButtonText: {
-    color: '#007AFF',
-    fontSize: 16,
+  filterChipActive: {
+    backgroundColor: colors.brand,
+    borderColor: colors.brand,
   },
-  listContainer: {
-    padding: 16,
-  },
-  documentCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  documentHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  fileName: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginRight: 12,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  statusText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  dateText: {
+  filterText: {
     fontSize: 13,
-    color: '#666',
-    marginTop: 4,
+    color: colors.textSecondary,
+    fontWeight: "600",
   },
-  emptyContainer: {
-    alignItems: 'center',
-    marginTop: 48,
+  filterTextActive: {
+    color: colors.white,
   },
-  emptyText: {
-    fontSize: 16,
-    color: '#999',
+  list: {
+    paddingHorizontal: space.lg,
+    paddingBottom: space.xxxl,
   },
-  loadingOverlay: {
+  overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: colors.overlay,
+    justifyContent: "center",
+    alignItems: "center",
   },
   loadingMore: {
-    marginVertical: 16,
+    marginVertical: space.lg,
   },
 });
