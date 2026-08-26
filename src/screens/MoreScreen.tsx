@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
 import { MoreScreenProps } from "../types/navigation";
 import authService from "../services/auth.service";
 import tenantService from "../services/tenant.service";
@@ -48,7 +49,7 @@ function formatRole(role?: string | null) {
 
 export default function MoreScreen({ navigation }: MoreScreenProps) {
   const unread = useUnreadCount();
-  const { colors, setTheme } = useAppTheme();
+  const { colors, setTheme, hydrateFromServer } = useAppTheme();
   const styles = useThemedStyles(createStyles);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [tenant, setTenant] = useState<Tenant | null>(null);
@@ -75,6 +76,12 @@ export default function MoreScreen({ navigation }: MoreScreenProps) {
   useEffect(() => {
     setPhotoFailed(false);
   }, [profile?.profile_pic_url, profile?.profile_pic]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void hydrateFromServer();
+    }, [hydrateFromServer])
+  );
 
   const handleSwitchWorkspace = () => {
     navigation.getParent()?.navigate("CompanySelection");

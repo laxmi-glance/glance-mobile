@@ -14,6 +14,7 @@ import dashboardService from "../services/dashboard.service";
 import financialDocumentService from "../services/financialDocument.service";
 import preferencesService from "../services/preferences.service";
 import tenantService from "../services/tenant.service";
+import { useAppTheme } from "../theme";
 import { useRbac } from "./useRbac";
 import { useUnreadCount } from "./useUnreadCount";
 import {
@@ -67,6 +68,7 @@ function isPeriod(value: string | null): value is DashboardPeriod {
 export function useDashboardHome() {
   const rbac = useRbac();
   const unread = useUnreadCount();
+  const { applyFromPreferences, getThemeWriteEpoch } = useAppTheme();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [companyName, setCompanyName] = useState("Workspace");
   const [logoUri, setLogoUri] = useState<string | null>(null);
@@ -123,6 +125,7 @@ export function useDashboardHome() {
     }
     setError(null);
     try {
+      const fetchEpoch = getThemeWriteEpoch();
       const storedPeriod = await AsyncStorage.getItem(PERIOD_KEY);
       const activePeriod: DashboardPeriod = isPeriod(storedPeriod) ? storedPeriod : period;
       if (activePeriod !== period) {
@@ -145,6 +148,7 @@ export function useDashboardHome() {
       );
       setPendingCount(stats?.pending || 0);
       setComplete(snapshot);
+      void applyFromPreferences(prefs, fetchEpoch);
 
       const defaultLayout = getLayoutSections(me?.role || rbac.role);
       const persona = resolveLayoutKey(me?.role || rbac.role);
@@ -332,7 +336,7 @@ export function useDashboardHome() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [period, perms, rbac.loading, rbac.role]);
+  }, [period, perms, rbac.loading, rbac.role, applyFromPreferences, getThemeWriteEpoch]);
 
   useEffect(() => {
     void load();
