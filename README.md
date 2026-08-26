@@ -57,7 +57,9 @@ Override with `EXPO_PUBLIC_API_BASE_URL` if needed (e.g. phone + local backend):
 EXPO_PUBLIC_API_BASE_URL=http://192.168.68.60:8000/api pnpm start:local
 ```
 
-## Run
+## Run & build
+
+Command reference (local, staging, tunnel, EAS APK/IPA): **[HELP.md](./HELP.md)**
 
 ```bash
 pnpm start:staging
