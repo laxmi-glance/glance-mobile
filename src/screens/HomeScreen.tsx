@@ -1,32 +1,37 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { View, Text, ScrollView, StyleSheet, RefreshControl, Alert } from "react-native";
+import { Text, ScrollView, StyleSheet, RefreshControl, Alert } from "react-native";
 import { HomeScreenProps } from "../types/navigation";
 import Screen from "../components/Screen";
-import BrandMark from "../components/BrandMark";
-import Button from "../components/Button";
+import PageHeader from "../components/PageHeader";
 import FeatureGrid from "../components/FeatureGrid";
 import tenantService from "../services/tenant.service";
+import companyService from "../services/company.service";
 import authService from "../services/auth.service";
-import type { Tenant, UserProfile } from "../types/models";
-import { useDocumentUpload } from "../hooks/useDocumentUpload";
+import type { UserProfile } from "../types/models";
 import { apiErrorMessage } from "../utils/errors";
-import { colors, radius, space, type } from "../theme";
+import { colors, space } from "../theme";
 import type { AppFeature } from "../config/features";
+import { useUnreadCount } from "../hooks/useUnreadCount";
 
 export default function HomeScreen({ navigation }: HomeScreenProps) {
+  const unread = useUnreadCount();
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [tenant, setTenant] = useState<Tenant | null>(null);
+  const [companyName, setCompanyName] = useState("Workspace");
+  const [logoUri, setLogoUri] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const { uploading, upload } = useDocumentUpload();
 
   const load = useCallback(async () => {
     try {
-      const [me, selected] = await Promise.all([
+      const [me, selected, company] = await Promise.all([
         authService.getProfile().catch(() => null),
         tenantService.getSelectedTenant(),
+        companyService.getCurrent(),
       ]);
       setProfile(me);
-      setTenant(selected);
+      setCompanyName(company?.name || selected?.company_name || "Workspace");
+      setLogoUri(
+        company?.logo || company?.logo_url || selected?.logo || selected?.logo_url || null
+      );
     } catch (error: unknown) {
       Alert.alert("Could not load workspace", apiErrorMessage(error));
     } finally {
@@ -38,10 +43,22 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
     void load();
   }, [load]);
 
-  const firstName = profile?.first_name || profile?.username || "there";
+  const displayName =
+    [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") ||
+    profile?.username ||
+    "there";
 
   return (
-    <Screen>
+    <Screen edges={[]}>
+      <PageHeader
+        title={companyName}
+        subtitle={`Hello, ${displayName}`}
+        iconUri={logoUri}
+        supportingIcon="notifications-outline"
+        supportingAccessibilityLabel="Notifications"
+        supportingBadge={unread}
+        onSupportingPress={() => navigation.navigate("Notifications")}
+      />
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={
@@ -54,30 +71,6 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
           />
         }
       >
-        <View style={styles.hero}>
-          <BrandMark size={36} framed />
-          <View style={styles.heroText}>
-            <Text style={styles.brand}>Glancewise</Text>
-            <Text style={styles.workspace} numberOfLines={1}>
-              {tenant?.company_name || "Workspace"}
-            </Text>
-          </View>
-        </View>
-
-        <Text style={styles.greeting}>Hello, {firstName}</Text>
-        <Text style={styles.lead}>
-          Capture documents, review processed amounts, and approve payables from your phone.
-        </Text>
-
-        <Button
-          label="Upload document"
-          icon="cloud-upload-outline"
-          onPress={upload}
-          loading={uploading}
-          style={styles.uploadBtn}
-        />
-        <Text style={styles.uploadHint}>Camera, photos, or PDF</Text>
-
         <Text style={styles.sectionTitle}>Workspace</Text>
         <FeatureGrid
           onOpenFeature={(feature: AppFeature) => {
@@ -85,8 +78,8 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
               navigation.navigate(feature.tab);
               return;
             }
-            if (feature.stack === "Notifications") {
-              navigation.navigate("Notifications");
+            if (feature.stack === "Notifications" || feature.stack === "Queue") {
+              navigation.navigate(feature.stack);
             }
           }}
         />
@@ -97,49 +90,9 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
 
 const styles = StyleSheet.create({
   content: {
-    padding: space.xl,
+    paddingHorizontal: space.xl,
+    paddingTop: space.lg,
     paddingBottom: 40,
-  },
-  hero: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: space.md,
-    marginBottom: space.xl,
-  },
-  heroText: {
-    flex: 1,
-  },
-  brand: {
-    ...type.subtitle,
-    color: colors.brand,
-    fontSize: 13,
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
-  },
-  workspace: {
-    ...type.heading,
-    marginTop: 2,
-  },
-  greeting: {
-    ...type.title,
-  },
-  lead: {
-    ...type.meta,
-    marginTop: 6,
-    marginBottom: space.xl,
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  uploadBtn: {
-    minHeight: 56,
-    borderRadius: radius.lg,
-  },
-  uploadHint: {
-    marginTop: space.sm,
-    marginBottom: space.xxl,
-    textAlign: "center",
-    fontSize: 13,
-    color: colors.textSecondary,
   },
   sectionTitle: {
     fontSize: 17,

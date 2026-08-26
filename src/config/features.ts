@@ -10,7 +10,7 @@ export type AppFeature = {
   subtitle: string;
   icon: IconName;
   available: boolean;
-  tab?: keyof MainTabParamList;
+  tab?: Exclude<keyof MainTabParamList, "Scan">;
   stack?: keyof RootStackParamList;
 };
 
@@ -33,7 +33,7 @@ export const APP_FEATURES: AppFeature[] = [
     subtitle: "Capture, upload, and track OCR",
     icon: "documents-outline",
     available: true,
-    tab: "Queue",
+    stack: "Queue",
   },
   {
     id: "notifications",
@@ -53,9 +53,10 @@ export const APP_FEATURES: AppFeature[] = [
   {
     id: "reports",
     title: "Reports",
-    subtitle: "P&L, aging, and cash flow",
+    subtitle: "P&L, balance sheet, and trial balance",
     icon: "bar-chart-outline",
-    available: false,
+    available: true,
+    tab: "Reports",
   },
   {
     id: "ledger",

@@ -7,7 +7,10 @@ import {
   ActivityIndicator,
   ScrollView,
   Linking,
+  Image,
+  TouchableOpacity,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { MoreScreenProps } from "../types/navigation";
 import authService from "../services/auth.service";
 import tenantService from "../services/tenant.service";
@@ -16,15 +19,32 @@ import { apiErrorMessage } from "../utils/errors";
 import { API_ENV, FRONTEND_URL } from "../config/env";
 import { APP_FEATURES, comingSoonCopy } from "../config/features";
 import Screen from "../components/Screen";
+import PageHeader from "../components/PageHeader";
 import ListRow from "../components/ListRow";
-import Card from "../components/Card";
-import NotificationBell from "../components/NotificationBell";
-import { colors, space } from "../theme";
+import { colors, radius, space } from "../theme";
+import { useUnreadCount } from "../hooks/useUnreadCount";
+
+const PROFILE_WEB_URL = `${FRONTEND_URL.replace(/\/+$/, "")}/user/user-profile`;
+const PANEL_BG = "#1C1C1E";
+const PANEL_BORDER = "rgba(167, 139, 250, 0.28)";
+const USERNAME_COLOR = "#B4B7E8";
+const ROLE_BG = "rgba(167, 139, 250, 0.16)";
+const ICON_MUTED = "#C7C7CC";
+
+function formatRole(role?: string | null) {
+  const value = (role || "").trim();
+  if (!value) {
+    return "";
+  }
+  return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+}
 
 export default function MoreScreen({ navigation }: MoreScreenProps) {
+  const unread = useUnreadCount();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [loading, setLoading] = useState(true);
+  const [photoFailed, setPhotoFailed] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -42,6 +62,10 @@ export default function MoreScreen({ navigation }: MoreScreenProps) {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    setPhotoFailed(false);
+  }, [profile?.profile_pic_url, profile?.profile_pic]);
 
   const handleSwitchWorkspace = () => {
     navigation.getParent()?.navigate("CompanySelection");
@@ -61,55 +85,107 @@ export default function MoreScreen({ navigation }: MoreScreenProps) {
     ]);
   };
 
+  const handleOpenSettings = () => {
+    void Linking.openURL(PROFILE_WEB_URL);
+  };
+
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={colors.brand} />
-      </View>
+      <Screen edges={[]}>
+        <PageHeader title="Account" subtitle="Profile and workspace" icon="person-circle-outline" />
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={colors.brand} />
+        </View>
+      </Screen>
     );
   }
 
   const displayName =
-    [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || profile?.username;
-  const initial = (displayName || "G").trim().charAt(0).toUpperCase();
+    [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") ||
+    profile?.username ||
+    "User";
+  const username = (profile?.username || "").replace(/^@/, "").trim();
+  const roleLabel = formatRole(profile?.role || tenant?.role);
+  // `profile_pic` is the short-lived signed URL; `profile_pic_url` is the private S3 key.
+  const photoUri = profile?.profile_pic || null;
+  const showPhoto = Boolean(photoUri) && !photoFailed;
+  const initial = displayName.trim().charAt(0).toUpperCase() || "G";
 
   return (
-    <Screen>
-      <View style={styles.header}>
-        <Text style={styles.heading}>More</Text>
-        <NotificationBell onPress={() => navigation.navigate("Notifications")} />
-      </View>
+    <Screen edges={[]}>
+      <PageHeader
+        title="Account"
+        subtitle="Profile and workspace"
+        icon="person-circle-outline"
+        supportingIcon="notifications-outline"
+        supportingAccessibilityLabel="Notifications"
+        supportingBadge={unread}
+        onSupportingPress={() => navigation.navigate("Notifications")}
+      />
 
       <ScrollView contentContainerStyle={styles.content}>
-        <Card style={styles.profile}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initial}</Text>
+        <View style={styles.profile}>
+          <View style={styles.profileMain}>
+            <View style={styles.avatarRing}>
+              {showPhoto ? (
+                <Image
+                  source={{ uri: photoUri as string }}
+                  style={styles.avatarPhoto}
+                  resizeMode="cover"
+                  accessibilityLabel="Profile photo"
+                  onError={() => setPhotoFailed(true)}
+                />
+              ) : (
+                <View style={styles.avatarFallback}>
+                  <Text style={styles.avatarText}>{initial}</Text>
+                </View>
+              )}
+            </View>
+            <View style={styles.identity}>
+              <Text style={styles.name} numberOfLines={1}>
+                {displayName}
+              </Text>
+              {username ? (
+                <Text style={styles.username} numberOfLines={1}>
+                  @{username}
+                </Text>
+              ) : null}
+              {tenant?.company_name ? (
+                <Text style={styles.company} numberOfLines={1}>
+                  {tenant.company_name}
+                </Text>
+              ) : null}
+              {roleLabel ? (
+                <View style={styles.roleWrap}>
+                  <Text style={styles.role}>{roleLabel}</Text>
+                </View>
+              ) : null}
+            </View>
           </View>
-          <View style={styles.profileText}>
-            <Text style={styles.name}>{displayName}</Text>
-            <Text style={styles.meta}>{profile?.email || profile?.username}</Text>
-            <Text style={styles.meta}>{tenant?.company_name}</Text>
-            {profile?.role ? (
-              <View style={styles.roleWrap}>
-                <Text style={styles.role}>{profile.role}</Text>
-              </View>
-            ) : null}
+
+          <View style={styles.toolbar}>
+            <TouchableOpacity
+              style={styles.toolbarBtn}
+              onPress={handleOpenSettings}
+              accessibilityRole="button"
+              accessibilityLabel="Settings"
+              hitSlop={6}
+            >
+              <Ionicons name="settings-outline" size={18} color={ICON_MUTED} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.toolbarBtn}
+              onPress={handleSignOut}
+              accessibilityRole="button"
+              accessibilityLabel="Sign out"
+              hitSlop={6}
+            >
+              <Ionicons name="log-out-outline" size={18} color={ICON_MUTED} />
+            </TouchableOpacity>
           </View>
-        </Card>
+        </View>
 
         <Text style={styles.section}>Workspace</Text>
-        <ListRow
-          icon="receipt-outline"
-          label="Payables"
-          subtitle="Amounts, status, and approvals"
-          onPress={() => navigation.navigate("AP")}
-        />
-        <ListRow
-          icon="notifications-outline"
-          label="Notifications"
-          subtitle="Approvals, failures, and mentions"
-          onPress={() => navigation.navigate("Notifications")}
-        />
         <ListRow
           icon="swap-horizontal-outline"
           label="Switch workspace"
@@ -134,9 +210,6 @@ export default function MoreScreen({ navigation }: MoreScreenProps) {
           />
         ))}
 
-        <Text style={styles.section}>Account</Text>
-        <ListRow icon="log-out-outline" label="Sign out" danger onPress={handleSignOut} />
-
         <Text style={styles.env}>Glancewise · {API_ENV}</Text>
       </ScrollView>
     </Screen>
@@ -148,69 +221,110 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: colors.background,
-  },
-  header: {
-    paddingHorizontal: space.xl,
-    paddingVertical: space.md,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  heading: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: colors.textHeading,
   },
   content: {
     paddingHorizontal: space.lg,
+    paddingTop: space.md,
     paddingBottom: 40,
   },
   profile: {
     flexDirection: "row",
-    gap: space.lg,
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: space.md,
     marginBottom: space.xl,
-    alignItems: "center",
+    paddingVertical: 16,
+    paddingHorizontal: 14,
+    backgroundColor: PANEL_BG,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: PANEL_BORDER,
   },
-  avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: colors.brandSoft,
+  profileMain: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    minWidth: 0,
+  },
+  avatarRing: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: "#C4B5FD",
+    overflow: "hidden",
+    backgroundColor: "#3A3A5C",
+  },
+  avatarPhoto: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+  },
+  avatarFallback: {
+    flex: 1,
+    borderRadius: 22,
+    backgroundColor: "#3A3A5C",
     alignItems: "center",
     justifyContent: "center",
   },
   avatarText: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: "700",
-    color: colors.brand,
+    color: colors.white,
   },
-  profileText: {
+  identity: {
     flex: 1,
+    minWidth: 0,
   },
   name: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: "700",
-    color: colors.textHeading,
+    color: colors.white,
+    letterSpacing: -0.2,
   },
-  meta: {
+  username: {
     marginTop: 2,
-    fontSize: 14,
-    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: "600",
+    color: USERNAME_COLOR,
+  },
+  company: {
+    marginTop: 6,
+    fontSize: 12,
+    color: "#A1A1AA",
   },
   roleWrap: {
     alignSelf: "flex-start",
     marginTop: 8,
-    backgroundColor: colors.brandSoft,
-    borderRadius: 6,
+    backgroundColor: ROLE_BG,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: PANEL_BORDER,
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 3,
   },
   role: {
-    color: colors.brand,
+    color: USERNAME_COLOR,
     fontWeight: "700",
-    fontSize: 12,
-    textTransform: "capitalize",
+    fontSize: 11,
+  },
+  toolbar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    padding: 2,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
+  toolbarBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
   },
   section: {
     marginTop: space.sm,

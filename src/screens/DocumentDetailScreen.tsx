@@ -10,6 +10,8 @@ import { formatDateTime, formatDurationSeconds } from "../utils/dates";
 import { canRetry, statusTone } from "../utils/documentStatus";
 import { apiErrorMessage } from "../utils/errors";
 import { colors, space } from "../theme";
+import Screen from "../components/Screen";
+import PageHeader from "../components/PageHeader";
 
 export default function DocumentDetailScreen({ route, navigation }: DocumentDetailScreenProps) {
   const { documentId } = route.params;
@@ -64,9 +66,18 @@ export default function DocumentDetailScreen({ route, navigation }: DocumentDeta
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={colors.brand} />
-      </View>
+      <Screen edges={["bottom"]}>
+        <PageHeader
+          title="Processing"
+          subtitle="Document status"
+          icon="sync-outline"
+          showBack
+          onBack={() => navigation.goBack()}
+        />
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={colors.brand} />
+        </View>
+      </Screen>
     );
   }
 
@@ -78,81 +89,97 @@ export default function DocumentDetailScreen({ route, navigation }: DocumentDeta
   const processedDocumentId = document.financial_document?.id;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Card style={styles.headerCard}>
-        <Text style={styles.fileName}>{document.file_name}</Text>
-        <View style={styles.badgeRow}>
-          <StatusBadge label={document.processing_status_display} tone={statusTone(document)} />
-        </View>
-      </Card>
+    <Screen edges={["bottom"]}>
+      <PageHeader
+        title="Processing"
+        subtitle={document.file_name || "Document status"}
+        icon="sync-outline"
+        showBack
+        onBack={() => navigation.goBack()}
+        menuActions={[
+          {
+            key: "refresh",
+            label: "Refresh",
+            onPress: () => void loadDocument(false),
+          },
+        ]}
+      />
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <Card style={styles.headerCard}>
+          <Text style={styles.fileName}>{document.file_name}</Text>
+          <View style={styles.badgeRow}>
+            <StatusBadge label={document.processing_status_display} tone={statusTone(document)} />
+          </View>
+        </Card>
 
-      <Card style={styles.section}>
-        <Text style={styles.sectionTitle}>Details</Text>
-        <InfoRow label="Type" value={document.document_type || "—"} />
-        <InfoRow label="Uploaded" value={formatDateTime(document.created_on)} />
-        <InfoRow label="Uploaded by" value={document.created_by || "—"} />
-        <InfoRow label="Started" value={formatDateTime(document.processing_started_at)} />
-        <InfoRow label="Validation" value={document.validation_status || "—"} />
-        <InfoRow label="Failures" value={String(document.failure_count ?? 0)} />
-        <InfoRow label="OCR time" value={formatDurationSeconds(document.ocr_duration_seconds)} />
-        <InfoRow
-          label="Total time"
-          value={formatDurationSeconds(document.total_processing_duration_seconds)}
-        />
-      </Card>
-
-      {document.financial_document ? (
         <Card style={styles.section}>
-          <Text style={styles.sectionTitle}>Linked invoice</Text>
-          <InfoRow label="Number" value={document.financial_document.invoice_number || "—"} />
-          <InfoRow label="Date" value={document.financial_document.invoice_date || "—"} />
+          <Text style={styles.sectionTitle}>Details</Text>
+          <InfoRow label="Type" value={document.document_type || "—"} />
+          <InfoRow label="Uploaded" value={formatDateTime(document.created_on)} />
+          <InfoRow label="Uploaded by" value={document.created_by || "—"} />
+          <InfoRow label="Started" value={formatDateTime(document.processing_started_at)} />
+          <InfoRow label="Validation" value={document.validation_status || "—"} />
+          <InfoRow label="Failures" value={String(document.failure_count ?? 0)} />
+          <InfoRow label="OCR time" value={formatDurationSeconds(document.ocr_duration_seconds)} />
           <InfoRow
-            label="Total"
-            value={
-              document.financial_document.total != null
-                ? String(document.financial_document.total)
-                : "—"
-            }
+            label="Total time"
+            value={formatDurationSeconds(document.total_processing_duration_seconds)}
           />
-          <InfoRow label="Approval" value={document.financial_document.approval_status || "—"} />
         </Card>
-      ) : null}
 
-      {document.duplicate_of ? (
-        <Card style={styles.section}>
-          <Text style={styles.sectionTitle}>Duplicate of</Text>
-          <InfoRow label="File" value={document.duplicate_of.file_name || "—"} />
-          <InfoRow label="Invoice" value={document.duplicate_of.invoice_number || "—"} />
-        </Card>
-      ) : null}
+        {document.financial_document ? (
+          <Card style={styles.section}>
+            <Text style={styles.sectionTitle}>Linked invoice</Text>
+            <InfoRow label="Number" value={document.financial_document.invoice_number || "—"} />
+            <InfoRow label="Date" value={document.financial_document.invoice_date || "—"} />
+            <InfoRow
+              label="Total"
+              value={
+                document.financial_document.total != null
+                  ? String(document.financial_document.total)
+                  : "—"
+              }
+            />
+            <InfoRow label="Approval" value={document.financial_document.approval_status || "—"} />
+          </Card>
+        ) : null}
 
-      {issueText ? (
-        <Card style={styles.section}>
-          <Text style={styles.sectionTitle}>Issue</Text>
-          <Text style={styles.issue}>{issueText}</Text>
-        </Card>
-      ) : null}
+        {document.duplicate_of ? (
+          <Card style={styles.section}>
+            <Text style={styles.sectionTitle}>Duplicate of</Text>
+            <InfoRow label="File" value={document.duplicate_of.file_name || "—"} />
+            <InfoRow label="Invoice" value={document.duplicate_of.invoice_number || "—"} />
+          </Card>
+        ) : null}
 
-      {processedDocumentId ? (
-        <Button
-          label="View details"
-          variant="secondary"
-          icon="receipt-outline"
-          onPress={() => navigation.navigate("ApDocument", { documentId: processedDocumentId })}
-          style={styles.action}
-        />
-      ) : null}
+        {issueText ? (
+          <Card style={styles.section}>
+            <Text style={styles.sectionTitle}>Issue</Text>
+            <Text style={styles.issue}>{issueText}</Text>
+          </Card>
+        ) : null}
 
-      {canRetry(document) ? (
-        <Button
-          label="Retry processing"
-          icon="refresh-outline"
-          onPress={handleRetry}
-          loading={retrying}
-          style={styles.action}
-        />
-      ) : null}
-    </ScrollView>
+        {processedDocumentId ? (
+          <Button
+            label="View details"
+            variant="secondary"
+            icon="receipt-outline"
+            onPress={() => navigation.navigate("ApDocument", { documentId: processedDocumentId })}
+            style={styles.action}
+          />
+        ) : null}
+
+        {canRetry(document) ? (
+          <Button
+            label="Retry processing"
+            icon="refresh-outline"
+            onPress={handleRetry}
+            loading={retrying}
+            style={styles.action}
+          />
+        ) : null}
+      </ScrollView>
+    </Screen>
   );
 }
 

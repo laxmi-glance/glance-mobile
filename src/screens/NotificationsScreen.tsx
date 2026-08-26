@@ -9,13 +9,13 @@ import {
   TouchableOpacity,
   Alert,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import { NotificationsScreenProps } from "../types/navigation";
 import notificationService from "../services/notification.service";
 import type { AppNotification } from "../types/models";
 import { formatDateTime } from "../utils/dates";
 import { apiErrorMessage } from "../utils/errors";
 import Screen from "../components/Screen";
+import PageHeader from "../components/PageHeader";
 import EmptyState from "../components/EmptyState";
 import { mergeUniqueById } from "../utils/lists";
 import { colors, radius, space } from "../theme";
@@ -91,20 +91,18 @@ export default function NotificationsScreen({ navigation }: NotificationsScreenP
   );
 
   return (
-    <Screen>
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          {navigation.canGoBack() ? (
-            <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={8} style={styles.back}>
-              <Ionicons name="chevron-back" size={22} color={colors.textHeading} />
-            </TouchableOpacity>
-          ) : null}
-          <Text style={styles.heading}>Notifications</Text>
-        </View>
-        <TouchableOpacity onPress={handleMarkAll} hitSlop={8}>
-          <Text style={styles.markAll}>Mark all read</Text>
-        </TouchableOpacity>
-      </View>
+    <Screen edges={["bottom"]}>
+      <PageHeader
+        title="Notifications"
+        subtitle="Approvals, failures, and mentions"
+        icon="notifications-outline"
+        showBack={navigation.canGoBack()}
+        onBack={() => navigation.goBack()}
+        menuActions={[
+          { key: "refresh", label: "Refresh", onPress: onRefresh },
+          { key: "mark-all", label: "Mark all read", onPress: () => void handleMarkAll() },
+        ]}
+      />
 
       <FlatList
         data={items}
@@ -137,32 +135,6 @@ export default function NotificationsScreen({ navigation }: NotificationsScreenP
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: space.xl,
-    paddingVertical: space.md,
-  },
-  heading: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: colors.textHeading,
-  },
-  headerLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    flex: 1,
-  },
-  back: {
-    marginRight: 4,
-  },
-  markAll: {
-    color: colors.interactive,
-    fontSize: 15,
-    fontWeight: "600",
-  },
   list: {
     paddingHorizontal: space.lg,
     paddingBottom: space.xxxl,

@@ -26,7 +26,11 @@
         "backgroundColor": "#13003E"
       },
       "package": "com.glancewise.mobile",
-      "permissions": ["android.permission.INTERNET", "android.permission.CAMERA"],
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.CAMERA"
+      ],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
@@ -34,6 +38,13 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Glancewise uses the camera to capture invoices and receipts.",
+          "recordAudioAndroid": false
+        }
+      ],
       [
         "expo-image-picker",
         {
@@ -44,7 +55,10 @@
       "expo-document-picker"
     ],
     "extra": {
-      "apiBaseUrl": ""
+      "apiBaseUrl": "",
+      "eas": {
+        "projectId": "2f839f17-366e-45a0-9633-a363ae4d4faa"
+      }
     }
   }
 }

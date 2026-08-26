@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
+  RefreshControl,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { CompanySelectionScreenProps } from "../types/navigation";
@@ -15,27 +16,45 @@ import authService from "../services/auth.service";
 import type { Tenant } from "../types/models";
 import { apiErrorMessage } from "../utils/errors";
 import Screen from "../components/Screen";
-import BrandMark from "../components/BrandMark";
+import PageHeader from "../components/PageHeader";
+import CompanyLogo from "../components/CompanyLogo";
 import EmptyState from "../components/EmptyState";
 import { colors, radius, space } from "../theme";
 
+function formatRole(role?: string | null) {
+  const value = (role || "").trim().replace(/_/g, " ");
+  if (!value) {
+    return "";
+  }
+  return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+}
+
 export default function CompanySelectionScreen({ navigation }: CompanySelectionScreenProps) {
+  const canGoBack = navigation.canGoBack();
   const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [selectingId, setSelectingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadTenants();
-  }, []);
-
-  const loadTenants = async () => {
+  const loadTenants = useCallback(async (isRefresh = false) => {
     try {
-      const stored = await authService.getStoredTenants();
-      if (stored.length) {
+      const [stored, current] = await Promise.all([
+        authService.getStoredTenants(),
+        tenantService.getSelectedTenant(),
+      ]);
+      if (stored.length && !isRefresh) {
         setTenants(stored);
+      }
+      if (current?.tenant_id) {
+        setSelectedId(current.tenant_id);
       }
       const data = await tenantService.listTenants();
       setTenants(data);
+      const latest = data.find((tenant) => tenant.is_current)?.tenant_id || current?.tenant_id;
+      if (latest) {
+        setSelectedId(latest);
+      }
     } catch (error: unknown) {
       const stored = await authService.getStoredTenants();
       if (stored.length) {
@@ -45,7 +64,20 @@ export default function CompanySelectionScreen({ navigation }: CompanySelectionS
       }
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  }, []);
+
+  useEffect(() => {
+    void loadTenants();
+  }, [loadTenants]);
+
+  const openWorkspace = () => {
+    if (canGoBack) {
+      navigation.goBack();
+      return;
+    }
+    navigation.reset({ index: 0, routes: [{ name: "Main" }] });
   };
 
   const handleSelectTenant = async (tenant: Tenant) => {
@@ -53,11 +85,15 @@ export default function CompanySelectionScreen({ navigation }: CompanySelectionS
       Alert.alert("Workspace unavailable", tenant.access_notice || "This company is not active.");
       return;
     }
+    if (selectedId && tenant.tenant_id === selectedId) {
+      openWorkspace();
+      return;
+    }
 
     setSelectingId(tenant.tenant_id);
     try {
       await authService.selectTenant(tenant.tenant_id);
-      await tenantService.persistSelectedTenant(tenant);
+      await tenantService.persistSelectedTenant({ ...tenant, is_current: true });
       navigation.reset({ index: 0, routes: [{ name: "Main" }] });
     } catch (error: unknown) {
       Alert.alert("Could not open workspace", apiErrorMessage(error));
@@ -80,76 +116,121 @@ export default function CompanySelectionScreen({ navigation }: CompanySelectionS
     ]);
   };
 
-  const renderTenant = ({ item }: { item: Tenant }) => {
+  const renderTenant = ({ item, index }: { item: Tenant; index: number }) => {
     const disabled = Boolean(item.is_deactivated);
     const busy = selectingId === item.tenant_id;
-    const initial = (item.company_name || "W").trim().charAt(0).toUpperCase();
+    const current = Boolean(selectedId && item.tenant_id === selectedId);
+    const role = formatRole(item.role);
+    const logoUri = item.logo || item.logo_url || null;
 
     return (
       <TouchableOpacity
-        style={[styles.card, disabled && styles.cardDisabled]}
+        style={[
+          styles.row,
+          current && styles.rowCurrent,
+          disabled && styles.rowDisabled,
+          index === 0 && styles.rowFirst,
+          index === tenants.length - 1 && styles.rowLast,
+        ]}
         onPress={() => handleSelectTenant(item)}
         disabled={disabled || Boolean(selectingId)}
-        activeOpacity={0.8}
+        activeOpacity={0.75}
+        accessibilityRole="button"
+        accessibilityState={{ selected: current, disabled }}
+        accessibilityLabel={item.company_name || "Workspace"}
       >
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{initial}</Text>
-        </View>
-        <View style={styles.cardInfo}>
-          <Text style={styles.companyName}>{item.company_name || "Untitled workspace"}</Text>
-          <Text style={styles.meta}>
-            {item.role}
-            {item.lifecycle_status ? ` · ${item.lifecycle_status}` : ""}
+        <CompanyLogo uri={logoUri} size={40} />
+        <View style={styles.rowInfo}>
+          <Text style={styles.companyName} numberOfLines={1}>
+            {item.company_name || "Untitled workspace"}
           </Text>
+          <View style={styles.metaRow}>
+            {role ? (
+              <View style={[styles.rolePill, current && styles.rolePillCurrent]}>
+                <Text style={[styles.roleText, current && styles.roleTextCurrent]}>{role}</Text>
+              </View>
+            ) : null}
+            {item.lifecycle_status && item.lifecycle_status !== "ACTIVE" ? (
+              <Text style={styles.lifecycle}>{item.lifecycle_status}</Text>
+            ) : null}
+          </View>
           {disabled && item.access_notice ? (
-            <Text style={styles.notice}>{item.access_notice}</Text>
+            <Text style={styles.notice} numberOfLines={2}>
+              {item.access_notice}
+            </Text>
           ) : null}
         </View>
         {busy ? (
           <ActivityIndicator color={colors.brand} />
+        ) : current ? (
+          <View style={styles.check}>
+            <Ionicons name="checkmark" size={16} color={colors.white} />
+          </View>
         ) : (
-          <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
         )}
       </TouchableOpacity>
     );
   };
 
-  if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={colors.brand} />
-      </View>
-    );
-  }
-
   return (
-    <Screen>
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <BrandMark size={32} framed />
-          <View>
-            {navigation.canGoBack() ? (
-              <TouchableOpacity onPress={() => navigation.goBack()}>
-                <Text style={styles.backText}>Back</Text>
-              </TouchableOpacity>
-            ) : null}
-            <Text style={styles.title}>Select workspace</Text>
-          </View>
-        </View>
-        <TouchableOpacity onPress={handleLogout} hitSlop={8}>
-          <Text style={styles.logoutText}>Sign out</Text>
-        </TouchableOpacity>
-      </View>
-
-      <FlatList
-        data={tenants}
-        renderItem={renderTenant}
-        keyExtractor={(item) => item.tenant_id}
-        contentContainerStyle={styles.list}
-        ListEmptyComponent={
-          <EmptyState title="No workspaces" hint="No companies are linked to this account yet." />
+    <Screen edges={["bottom"]}>
+      <PageHeader
+        title="Workspaces"
+        subtitle={canGoBack ? "Switch to another company" : "Choose a company to continue"}
+        icon="swap-horizontal-outline"
+        showBack={canGoBack}
+        onBack={() => navigation.goBack()}
+        menuActions={
+          canGoBack
+            ? [{ key: "refresh", label: "Refresh", onPress: () => void loadTenants(true) }]
+            : [
+                { key: "refresh", label: "Refresh", onPress: () => void loadTenants(true) },
+                { key: "signout", label: "Sign out", destructive: true, onPress: handleLogout },
+              ]
         }
       />
+
+      {loading ? (
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={colors.brand} />
+        </View>
+      ) : (
+        <FlatList
+          data={tenants}
+          renderItem={renderTenant}
+          keyExtractor={(item) => item.tenant_id}
+          contentContainerStyle={styles.list}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                void loadTenants(true);
+              }}
+            />
+          }
+          ListHeaderComponent={
+            tenants.length ? <Text style={styles.section}>Companies</Text> : null
+          }
+          ListEmptyComponent={
+            <EmptyState title="No workspaces" hint="No companies are linked to this account yet." />
+          }
+          ListFooterComponent={
+            canGoBack ? null : (
+              <TouchableOpacity
+                onPress={handleLogout}
+                style={styles.signOut}
+                accessibilityRole="button"
+                accessibilityLabel="Sign out"
+              >
+                <Text style={styles.signOutText}>Sign out</Text>
+              </TouchableOpacity>
+            )
+          }
+        />
+      )}
     </Screen>
   );
 }
@@ -159,85 +240,112 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: colors.background,
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: space.xl,
-    paddingVertical: space.lg,
+  list: {
+    paddingHorizontal: space.lg,
+    paddingTop: space.md,
+    paddingBottom: space.xxxl,
   },
-  headerLeft: {
+  section: {
+    marginBottom: space.sm,
+    marginLeft: 4,
+    fontSize: 12,
+    fontWeight: "700",
+    color: colors.textMuted,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+  row: {
+    backgroundColor: colors.surface,
+    paddingVertical: 14,
+    paddingHorizontal: space.lg,
     flexDirection: "row",
     alignItems: "center",
     gap: space.md,
-    flex: 1,
-    marginRight: space.md,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: colors.border,
   },
-  title: {
-    fontSize: 22,
+  rowCurrent: {
+    backgroundColor: colors.brandSoft,
+  },
+  rowDisabled: {
+    opacity: 0.55,
+  },
+  rowFirst: {
+    borderTopWidth: 1,
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
+  },
+  rowLast: {
+    borderBottomWidth: 1,
+    borderBottomLeftRadius: radius.lg,
+    borderBottomRightRadius: radius.lg,
+  },
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.border,
+    marginLeft: 40 + space.lg + space.md,
+  },
+  rowInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  companyName: {
+    fontSize: 16,
     fontWeight: "700",
     color: colors.textHeading,
   },
-  backText: {
-    color: colors.interactive,
-    fontSize: 14,
-    fontWeight: "600",
-    marginBottom: 2,
-  },
-  logoutText: {
-    color: colors.danger,
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  list: {
-    paddingHorizontal: space.xl,
-    paddingBottom: space.xxxl,
-  },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: space.lg,
-    marginBottom: space.md,
+  metaRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: space.md,
+    gap: 8,
+    marginTop: 6,
   },
-  cardDisabled: {
-    opacity: 0.55,
+  rolePill: {
+    alignSelf: "flex-start",
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
   },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: colors.brandSoft,
-    alignItems: "center",
-    justifyContent: "center",
+  rolePillCurrent: {
+    backgroundColor: colors.white,
   },
-  avatarText: {
-    fontSize: 18,
+  roleText: {
+    fontSize: 11,
     fontWeight: "700",
     color: colors.brand,
   },
-  cardInfo: {
-    flex: 1,
+  roleTextCurrent: {
+    color: colors.brand,
   },
-  companyName: {
-    fontSize: 17,
+  lifecycle: {
+    fontSize: 11,
     fontWeight: "600",
-    color: colors.text,
-  },
-  meta: {
-    marginTop: 4,
-    fontSize: 13,
-    color: colors.textSecondary,
+    color: colors.textMuted,
+    textTransform: "capitalize",
   },
   notice: {
-    marginTop: 8,
-    fontSize: 13,
+    marginTop: 6,
+    fontSize: 12,
+    color: colors.danger,
+  },
+  check: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.brand,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  signOut: {
+    alignItems: "center",
+    paddingVertical: space.xl,
+  },
+  signOutText: {
+    fontSize: 15,
+    fontWeight: "600",
     color: colors.danger,
   },
 });

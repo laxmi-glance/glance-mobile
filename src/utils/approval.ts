@@ -51,30 +51,43 @@ export function vendorName(item: FinancialDocumentListItem): string {
   return item.vendor?.name || item.suggested_vendor?.name || "No vendor yet";
 }
 
+export type ApprovalActionGate = {
+  canApprove: boolean;
+  canReject: boolean;
+  reason?: string;
+};
+
+function denied(reason?: string): ApprovalActionGate {
+  return { canApprove: false, canReject: false, reason };
+}
+
 export function canActOnApproval(
   doc: FinancialDocumentDetail,
   config: RbacConfig | null | undefined,
   role: string | null | undefined,
   username?: string | null
-): { canApprove: boolean; reason?: string } {
+): ApprovalActionGate {
   if (role === "sales_manager") {
-    return { canApprove: false, reason: "Forwarding for approval is available on the web app." };
+    return denied("Forwarding for approval is available on the web app.");
   }
   if (!canApproveFinancialDocuments(config, role)) {
-    return { canApprove: false };
-  }
-  if (doc.approval_status === "approved") {
-    return { canApprove: false, reason: "This document is already approved." };
+    return denied();
   }
   if (doc.gl_posting_status === "POSTED") {
-    return { canApprove: false, reason: "Posted documents cannot be approved or rejected." };
+    return denied("Posted documents cannot be approved or rejected.");
   }
   if (isProcessingRow(doc)) {
-    return { canApprove: false, reason: "Wait until processing finishes." };
+    return denied("Wait until processing finishes.");
   }
   const isOwnDoc = Boolean(username && doc.created_by && doc.created_by === username);
   if (isOwnDoc && !rbacAllows(config, role, "financial_document", "self_approve")) {
-    return { canApprove: false, reason: "You cannot approve a document you uploaded." };
+    return denied("You cannot approve a document you uploaded.");
   }
-  return { canApprove: true };
+  if (doc.approval_status === "approved") {
+    return { canApprove: false, canReject: true };
+  }
+  if (doc.approval_status === "rejected") {
+    return { canApprove: true, canReject: false };
+  }
+  return { canApprove: true, canReject: true };
 }

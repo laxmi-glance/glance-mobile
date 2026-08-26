@@ -21,23 +21,15 @@ import type {
 import ApDocumentRow from "../components/ApDocumentRow";
 import EmptyState from "../components/EmptyState";
 import Screen from "../components/Screen";
-import Button from "../components/Button";
+import PageHeader from "../components/PageHeader";
 import { apiErrorMessage } from "../utils/errors";
-import { useDocumentUpload } from "../hooks/useDocumentUpload";
 import { useRbac } from "../hooks/useRbac";
 import { isProcessingRow } from "../utils/approval";
 import { mergeUniqueById } from "../utils/lists";
 import { colors, radius, space } from "../theme";
 
-const FILTERS: { label: string; value?: ApprovalStatus }[] = [
-  { label: "All" },
-  { label: "Pending", value: "pending" },
-  { label: "Approved", value: "approved" },
-  { label: "Rejected", value: "rejected" },
-];
-
 export default function ApListScreen({ navigation }: ApScreenProps) {
-  const { canUpload, canViewAp, config, loading: rbacLoading } = useRbac();
+  const { canViewAp, config, loading: rbacLoading } = useRbac();
   const [documents, setDocuments] = useState<FinancialDocumentListItem[]>([]);
   const [stats, setStats] = useState<FinancialDocumentStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -68,7 +60,7 @@ export default function ApListScreen({ navigation }: ApScreenProps) {
           setStats(listStats);
         }
       } catch (error: unknown) {
-        Alert.alert("Could not load payables", apiErrorMessage(error));
+        Alert.alert("Could not load documents", apiErrorMessage(error));
       } finally {
         setLoading(false);
         setRefreshing(false);
@@ -77,10 +69,6 @@ export default function ApListScreen({ navigation }: ApScreenProps) {
     },
     [approvalStatus]
   );
-
-  const { uploading, upload } = useDocumentUpload(() => {
-    void loadDocuments(1, true);
-  });
 
   useEffect(() => {
     if (rbacLoading) {
@@ -105,40 +93,69 @@ export default function ApListScreen({ navigation }: ApScreenProps) {
 
   if (!rbacLoading && config && !canViewAp) {
     return (
-      <Screen>
+      <Screen edges={[]}>
+        <PageHeader
+          title="Documents"
+          subtitle="Processed Documents list"
+          icon="documents-outline"
+        />
         <EmptyState
           icon="lock-closed-outline"
-          title="Payables are not available"
-          hint="Your role cannot view AP documents in this workspace."
+          title="Documents are not available"
+          hint="Your role cannot view documents in this workspace."
         />
       </Screen>
     );
   }
 
   return (
-    <Screen>
-      <View style={styles.header}>
-        <View style={styles.headerText}>
-          <Text style={styles.title}>Payables</Text>
-          <Text style={styles.subtitle}>Uploaded documents and approval status</Text>
-        </View>
-        {canUpload ? (
-          <Button
-            label="Upload"
-            icon="cloud-upload-outline"
-            onPress={upload}
-            loading={uploading}
-            style={styles.uploadBtn}
-          />
-        ) : null}
-      </View>
+    <Screen edges={[]}>
+      <PageHeader
+        title="Documents"
+        subtitle="Processed Documents list"
+        icon="documents-outline"
+        supportingIcon="file-tray-full-outline"
+        supportingAccessibilityLabel="Open processing queue"
+        onSupportingPress={() => navigation.navigate("Queue")}
+        menuActions={[
+          {
+            key: "refresh",
+            label: "Refresh",
+            onPress: () => {
+              setRefreshing(true);
+              void loadDocuments(1, true);
+            },
+          },
+        ]}
+      />
 
       {stats ? (
         <View style={styles.statsRow}>
-          <StatChip label="Total" value={stats.total} />
-          <StatChip label="Pending" value={stats.pending} />
-          <StatChip label="Approved" value={stats.approved} />
-          <StatChip label="Rejected" value={stats.rejected} accent={stats.rejected > 0} />
+          <StatChip
+            label="Total"
+            value={stats.total}
+            active={!approvalStatus}
+            onPress={() => setApprovalStatus(undefined)}
+          />
+          <StatChip
+            label="Pending"
+            value={stats.pending}
+            active={approvalStatus === "pending"}
+            onPress={() => setApprovalStatus("pending")}
+          />
+          <StatChip
+            label="Approved"
+            value={stats.approved}
+            active={approvalStatus === "approved"}
+            onPress={() => setApprovalStatus("approved")}
+          />
+          <StatChip
+            label="Rejected"
+            value={stats.rejected}
+            accent={stats.rejected > 0}
+            active={approvalStatus === "rejected"}
+            onPress={() => setApprovalStatus("rejected")}
+          />
         </View>
       ) : null}
 
@@ -156,23 +173,6 @@ export default function ApListScreen({ navigation }: ApScreenProps) {
             void loadDocuments(1, true);
           }}
         />
-      </View>
-
-      <View style={styles.filters}>
-        {FILTERS.map((filter) => {
-          const active = approvalStatus === filter.value;
-          return (
-            <TouchableOpacity
-              key={filter.label}
-              style={[styles.filterChip, active && styles.filterChipActive]}
-              onPress={() => setApprovalStatus(filter.value)}
-            >
-              <Text style={[styles.filterText, active && styles.filterTextActive]}>
-                {filter.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
       </View>
 
       <FlatList
@@ -193,7 +193,7 @@ export default function ApListScreen({ navigation }: ApScreenProps) {
           !loading ? (
             <EmptyState
               icon="receipt-outline"
-              title="No AP documents yet"
+              title="No documents yet"
               hint="Capture a receipt or upload a PDF. Processed amounts appear here after OCR."
             />
           ) : null
@@ -209,44 +209,46 @@ export default function ApListScreen({ navigation }: ApScreenProps) {
   );
 }
 
-function StatChip({ label, value, accent }: { label: string; value: number; accent?: boolean }) {
+function StatChip({
+  label,
+  value,
+  accent,
+  active,
+  onPress,
+}: {
+  label: string;
+  value: number;
+  accent?: boolean;
+  active?: boolean;
+  onPress: () => void;
+}) {
   return (
-    <View style={styles.statChip}>
-      <Text style={[styles.statValue, accent && { color: colors.danger }]}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
-    </View>
+    <TouchableOpacity
+      style={[styles.statChip, active && styles.statChipActive]}
+      onPress={onPress}
+      activeOpacity={0.8}
+      accessibilityRole="button"
+      accessibilityState={{ selected: Boolean(active) }}
+    >
+      <Text
+        style={[
+          styles.statValue,
+          accent && { color: colors.danger },
+          active && styles.statValueActive,
+        ]}
+      >
+        {value}
+      </Text>
+      <Text style={[styles.statLabel, active && styles.statLabelActive]}>{label}</Text>
+    </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: space.xl,
-    paddingVertical: space.md,
-    gap: space.md,
-  },
-  headerText: {
-    flex: 1,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: colors.textHeading,
-  },
-  subtitle: {
-    marginTop: 2,
-    fontSize: 13,
-    color: colors.textSecondary,
-  },
-  uploadBtn: {
-    minHeight: 40,
-    paddingHorizontal: 14,
-  },
   statsRow: {
     flexDirection: "row",
     paddingHorizontal: space.lg,
+    paddingTop: space.md,
     gap: space.sm,
   },
   statChip: {
@@ -258,15 +260,26 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     alignItems: "center",
   },
+  statChipActive: {
+    backgroundColor: colors.brandSoft,
+    borderColor: colors.brand,
+  },
   statValue: {
     fontSize: 18,
     fontWeight: "700",
     color: colors.text,
   },
+  statValueActive: {
+    color: colors.brand,
+  },
   statLabel: {
     fontSize: 11,
     color: colors.textSecondary,
     marginTop: 2,
+  },
+  statLabelActive: {
+    color: colors.brand,
+    fontWeight: "700",
   },
   searchRow: {
     marginHorizontal: space.lg,
@@ -286,34 +299,9 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.text,
   },
-  filters: {
-    flexDirection: "row",
-    paddingHorizontal: space.lg,
-    paddingVertical: space.md,
-    gap: space.sm,
-  },
-  filterChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: radius.full,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  filterChipActive: {
-    backgroundColor: colors.brand,
-    borderColor: colors.brand,
-  },
-  filterText: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    fontWeight: "600",
-  },
-  filterTextActive: {
-    color: colors.white,
-  },
   list: {
     paddingHorizontal: space.lg,
+    paddingTop: space.md,
     paddingBottom: space.xxxl,
   },
   overlay: {

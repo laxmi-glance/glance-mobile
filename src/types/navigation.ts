@@ -10,12 +10,16 @@ export type RootStackParamList = {
   DocumentDetail: { documentId: string };
   ApDocument: { documentId: string };
   Notifications: undefined;
+  Queue: undefined;
+  Scanner: undefined;
+  Report: { reportId: string };
 };
 
 export type MainTabParamList = {
   Home: undefined;
   AP: undefined;
-  Queue: undefined;
+  Scan: undefined;
+  Reports: undefined;
   More: undefined;
 };
 
@@ -31,6 +35,9 @@ export type DocumentDetailScreenProps = NativeStackScreenProps<
 >;
 export type ApDocumentScreenProps = NativeStackScreenProps<RootStackParamList, "ApDocument">;
 export type NotificationsStackProps = NativeStackScreenProps<RootStackParamList, "Notifications">;
+export type QueueScreenProps = NativeStackScreenProps<RootStackParamList, "Queue">;
+export type ScannerScreenProps = NativeStackScreenProps<RootStackParamList, "Scanner">;
+export type ReportScreenProps = NativeStackScreenProps<RootStackParamList, "Report">;
 
 export type HomeScreenProps = CompositeScreenProps<
   BottomTabScreenProps<MainTabParamList, "Home">,
@@ -40,8 +47,8 @@ export type ApScreenProps = CompositeScreenProps<
   BottomTabScreenProps<MainTabParamList, "AP">,
   NativeStackScreenProps<RootStackParamList>
 >;
-export type QueueScreenProps = CompositeScreenProps<
-  BottomTabScreenProps<MainTabParamList, "Queue">,
+export type ReportsScreenProps = CompositeScreenProps<
+  BottomTabScreenProps<MainTabParamList, "Reports">,
   NativeStackScreenProps<RootStackParamList>
 >;
 export type MoreScreenProps = CompositeScreenProps<

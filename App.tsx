@@ -16,6 +16,9 @@ import CompanySelectionScreen from "./src/screens/CompanySelectionScreen";
 import DocumentDetailScreen from "./src/screens/DocumentDetailScreen";
 import ApDocumentScreen from "./src/screens/ApDocumentScreen";
 import NotificationsScreen from "./src/screens/NotificationsScreen";
+import ProcessingQueueScreen from "./src/screens/ProcessingQueueScreen";
+import ReportScreen from "./src/screens/ReportScreen";
+import ScannerScreen from "./src/screens/ScannerScreen";
 import MainTabs from "./src/navigation/MainTabs";
 import rbacService from "./src/services/rbac.service";
 
@@ -91,18 +94,35 @@ export default function App() {
             <Stack.Screen
               name="DocumentDetail"
               component={DocumentDetailScreen}
-              options={{ title: "Processing" }}
+              options={{ headerShown: false }}
             />
             <Stack.Screen
               name="ApDocument"
               component={ApDocumentScreen}
-              options={{ title: "Payable" }}
+              options={{ headerShown: false }}
             />
             <Stack.Screen
               name="Notifications"
               component={NotificationsScreen}
               options={{ headerShown: false }}
             />
+            <Stack.Screen
+              name="Queue"
+              component={ProcessingQueueScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="Scanner"
+              component={ScannerScreen}
+              options={{
+                headerShown: false,
+                presentation: "fullScreenModal",
+                animation: "slide_from_bottom",
+                contentStyle: { backgroundColor: "#000000" },
+                statusBarStyle: "light",
+              }}
+            />
+            <Stack.Screen name="Report" component={ReportScreen} options={{ headerShown: false }} />
           </Stack.Navigator>
         </NavigationContainer>
         <StatusBar style="dark" />

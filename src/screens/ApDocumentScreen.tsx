@@ -5,9 +5,9 @@ import financialDocumentService from "../services/financialDocument.service";
 import type { FinancialDocumentDetail } from "../types/models";
 import StatusBadge from "../components/StatusBadge";
 import Card from "../components/Card";
-import Button from "../components/Button";
 import DocumentPreview from "../components/DocumentPreview";
 import RejectReasonModal from "../components/RejectReasonModal";
+import ApprovalActions from "../components/ApprovalActions";
 import { formatDate, formatDateTime } from "../utils/dates";
 import { formatMoney, humanizeKey } from "../utils/money";
 import { resolvePayableAmounts, type PayableAmounts } from "../utils/payableAmounts";
@@ -21,13 +21,15 @@ import {
 } from "../utils/approval";
 import { useRbac } from "../hooks/useRbac";
 import { colors, space } from "../theme";
+import Screen from "../components/Screen";
+import PageHeader from "../components/PageHeader";
 
 export default function ApDocumentScreen({ route, navigation }: ApDocumentScreenProps) {
   const { documentId } = route.params;
   const rbac = useRbac();
   const [document, setDocument] = useState<FinancialDocumentDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [acting, setActing] = useState(false);
+  const [actingOn, setActingOn] = useState<"approved" | "rejected" | null>(null);
   const [rejectOpen, setRejectOpen] = useState(false);
 
   const loadDocument = useCallback(
@@ -55,7 +57,7 @@ export default function ApDocumentScreen({ route, navigation }: ApDocumentScreen
     if (!document) {
       return;
     }
-    setActing(true);
+    setActingOn(status);
     try {
       await financialDocumentService.submitApproval({
         documentId: document.id,
@@ -70,15 +72,24 @@ export default function ApDocumentScreen({ route, navigation }: ApDocumentScreen
     } catch (error: unknown) {
       Alert.alert("Could not update approval", apiErrorMessage(error));
     } finally {
-      setActing(false);
+      setActingOn(null);
     }
   };
 
   if (loading || !document) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={colors.brand} />
-      </View>
+      <Screen edges={["bottom"]}>
+        <PageHeader
+          title="Document"
+          subtitle="Payable details"
+          icon="receipt-outline"
+          showBack
+          onBack={() => navigation.goBack()}
+        />
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={colors.brand} />
+        </View>
+      </Screen>
     );
   }
 
@@ -117,117 +128,137 @@ export default function ApDocumentScreen({ route, navigation }: ApDocumentScreen
   ].filter((row) => row.value && row.value !== "—");
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Card style={styles.headerCard}>
-        <Text style={styles.vendor}>{vendorName(document)}</Text>
-        <Text style={styles.invoice}>
-          {document.invoice_number || document.file_name || "AP document"}
-        </Text>
-        <Text style={styles.amount}>{formatMoney(heroAmount, currency)}</Text>
-        {netDiffers ? <Text style={styles.heroHint}>Net payable</Text> : null}
-        {headerMeta ? <Text style={styles.metaLine}>{headerMeta}</Text> : null}
-        {dueDate !== "—" ? <Text style={styles.dueLine}>Due {dueDate}</Text> : null}
-        <View style={styles.badgeRow}>
-          <StatusBadge
-            label={approvalLabel(document.approval_status)}
-            tone={approvalTone(document.approval_status)}
-          />
-          {document.gl_posting_status ? (
+    <Screen edges={["bottom"]}>
+      <PageHeader
+        title={vendorName(document)}
+        subtitle={document.invoice_number || document.file_name || "AP document"}
+        icon="receipt-outline"
+        showBack
+        onBack={() => navigation.goBack()}
+        menuActions={[
+          {
+            key: "refresh",
+            label: "Refresh",
+            onPress: () => void loadDocument(false),
+          },
+        ]}
+      />
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <Card style={styles.headerCard}>
+          <Text style={styles.vendor}>{vendorName(document)}</Text>
+          <Text style={styles.invoice}>
+            {document.invoice_number || document.file_name || "AP document"}
+          </Text>
+          <Text style={styles.amount}>{formatMoney(heroAmount, currency)}</Text>
+          {netDiffers ? <Text style={styles.heroHint}>Net payable</Text> : null}
+          {headerMeta ? <Text style={styles.metaLine}>{headerMeta}</Text> : null}
+          {dueDate !== "—" ? <Text style={styles.dueLine}>Due {dueDate}</Text> : null}
+          <View style={styles.badgeRow}>
             <StatusBadge
-              label={humanizeKey(document.gl_posting_status)}
-              tone={document.gl_posting_status === "POSTED" ? "success" : "neutral"}
+              label={approvalLabel(document.approval_status)}
+              tone={approvalTone(document.approval_status)}
             />
-          ) : null}
-        </View>
-      </Card>
-
-      {document.file_url ? (
-        <Card style={[styles.section, styles.previewCard]} padded={false}>
-          <Text style={styles.previewTitle}>Original document</Text>
-          <DocumentPreview url={document.file_url} fileName={document.file_name} />
+            {document.gl_posting_status ? (
+              <StatusBadge
+                label={humanizeKey(document.gl_posting_status)}
+                tone={document.gl_posting_status === "POSTED" ? "success" : "neutral"}
+              />
+            ) : null}
+          </View>
         </Card>
-      ) : null}
 
-      {amountRows.length ? (
-        <Card style={styles.section}>
-          <Text style={styles.sectionTitle}>Amounts</Text>
-          {amountRows.map((row) => (
-            <InfoRow key={row.label} label={row.label} value={row.value} />
-          ))}
-        </Card>
-      ) : null}
-
-      {parentItems.length ? (
-        <Card style={styles.section}>
-          <Text style={styles.sectionTitle}>Line items</Text>
-          {parentItems.map((item) => (
-            <View key={item.id} style={styles.line}>
-              <Text style={styles.lineDesc} numberOfLines={2}>
-                {item.description || "Line"}
-              </Text>
-              <Text style={styles.lineAmt}>
-                {formatMoney(
-                  item.line_total ?? item.base_amount ?? item.amount ?? item.total,
-                  currency
-                )}
-              </Text>
-            </View>
-          ))}
-        </Card>
-      ) : null}
-
-      {approvalRows.length ? (
-        <Card style={styles.section}>
-          <Text style={styles.sectionTitle}>Approval</Text>
-          {approvalRows.map((row) => (
-            <InfoRow key={row.label} label={row.label} value={row.value} />
-          ))}
-        </Card>
-      ) : null}
-
-      {actionGate.canApprove ? (
-        <View style={styles.actions}>
-          <Button
-            label="Reject"
-            variant="danger"
-            icon="close-outline"
-            disabled={acting}
-            onPress={() => setRejectOpen(true)}
-            style={styles.actionBtn}
-          />
-          <Button
-            label="Approve"
-            icon="checkmark-outline"
-            loading={acting}
-            onPress={() => {
-              Alert.alert("Approve document", "Approve this payable as per your workspace role?", [
+        <ApprovalActions
+          canApprove={actionGate.canApprove}
+          canReject={actionGate.canReject}
+          actingOn={actingOn}
+          onReject={() => setRejectOpen(true)}
+          onApprove={() => {
+            const reversing = document.approval_status === "rejected";
+            Alert.alert(
+              reversing ? "Approve rejected document" : "Approve document",
+              reversing
+                ? "This payable was rejected. Approve it now?"
+                : "Approve this payable as per your workspace role?",
+              [
                 { text: "Cancel", style: "cancel" },
                 { text: "Approve", onPress: () => void submit("approved") },
-              ]);
-            }}
-            style={styles.actionBtn}
-          />
-        </View>
-      ) : actionGate.reason ? (
-        <Text style={styles.hint}>{actionGate.reason}</Text>
-      ) : null}
+              ]
+            );
+          }}
+        />
+        {actionGate.reason && !actionGate.canApprove && !actionGate.canReject ? (
+          <Text style={styles.hint}>{actionGate.reason}</Text>
+        ) : null}
 
-      {recordRows.length ? (
-        <Card style={styles.section}>
-          <Text style={styles.sectionTitle}>Record</Text>
-          {recordRows.map((row) => (
-            <InfoRow key={row.label} label={row.label} value={row.value} />
-          ))}
-        </Card>
-      ) : null}
+        {document.file_url ? (
+          <Card style={[styles.section, styles.previewCard]} padded={false}>
+            <Text style={styles.previewTitle}>Original document</Text>
+            <DocumentPreview url={document.file_url} fileName={document.file_name} />
+          </Card>
+        ) : null}
 
-      <RejectReasonModal
-        visible={rejectOpen}
-        loading={acting}
-        onClose={() => setRejectOpen(false)}
-        onSubmit={(remarks) => void submit("rejected", remarks)}
-      />
-    </ScrollView>
+        {amountRows.length ? (
+          <Card style={styles.section}>
+            <Text style={styles.sectionTitle}>Amounts</Text>
+            {amountRows.map((row) => (
+              <InfoRow key={row.label} label={row.label} value={row.value} />
+            ))}
+          </Card>
+        ) : null}
+
+        {parentItems.length ? (
+          <Card style={styles.section}>
+            <Text style={styles.sectionTitle}>Line items</Text>
+            {parentItems.map((item) => (
+              <View key={item.id} style={styles.line}>
+                <Text style={styles.lineDesc} numberOfLines={2}>
+                  {item.description || "Line"}
+                </Text>
+                <Text style={styles.lineAmt}>
+                  {formatMoney(
+                    item.line_total ?? item.base_amount ?? item.amount ?? item.total,
+                    currency
+                  )}
+                </Text>
+              </View>
+            ))}
+          </Card>
+        ) : null}
+
+        {approvalRows.length ? (
+          <Card style={styles.section}>
+            <Text style={styles.sectionTitle}>Approval</Text>
+            {approvalRows.map((row) => (
+              <InfoRow key={row.label} label={row.label} value={row.value} />
+            ))}
+          </Card>
+        ) : null}
+
+        {recordRows.length ? (
+          <Card style={styles.section}>
+            <Text style={styles.sectionTitle}>Record</Text>
+            {recordRows.map((row) => (
+              <InfoRow key={row.label} label={row.label} value={row.value} />
+            ))}
+          </Card>
+        ) : null}
+
+        <RejectReasonModal
+          visible={rejectOpen}
+          loading={actingOn === "rejected"}
+          title={
+            document.approval_status === "approved" ? "Reject approved document" : "Reject document"
+          }
+          lead={
+            document.approval_status === "approved"
+              ? "This payable is approved. Add a reason to reject it."
+              : "A reason is required so the submitter knows what to fix."
+          }
+          onClose={() => setRejectOpen(false)}
+          onSubmit={(remarks) => void submit("rejected", remarks)}
+        />
+      </ScrollView>
+    </Screen>
   );
 }
 
@@ -382,15 +413,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     color: colors.textHeading,
-  },
-  actions: {
-    flexDirection: "row",
-    gap: space.md,
-    marginTop: space.md,
-    marginBottom: space.md,
-  },
-  actionBtn: {
-    flex: 1,
   },
   hint: {
     marginTop: space.md,

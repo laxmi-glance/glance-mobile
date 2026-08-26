@@ -16,9 +16,18 @@ type Props = {
   onClose: () => void;
   onSubmit: (remarks: string) => void;
   loading?: boolean;
+  title?: string;
+  lead?: string;
 };
 
-export default function RejectReasonModal({ visible, onClose, onSubmit, loading }: Props) {
+export default function RejectReasonModal({
+  visible,
+  onClose,
+  onSubmit,
+  loading,
+  title = "Reject document",
+  lead = "A reason is required so the submitter knows what to fix.",
+}: Props) {
   const [remarks, setRemarks] = useState("");
 
   const handleClose = () => {
@@ -33,8 +42,8 @@ export default function RejectReasonModal({ visible, onClose, onSubmit, loading 
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <View style={styles.sheet}>
-          <Text style={styles.title}>Reject document</Text>
-          <Text style={styles.lead}>A reason is required so the submitter knows what to fix.</Text>
+          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.lead}>{lead}</Text>
           <TextInput
             style={styles.input}
             placeholder="Rejection reason"
