@@ -31,13 +31,22 @@ export const LAYOUT_BY_ROLE: Record<string, DashboardLayoutKey> = {
   auditor: "auditor",
 };
 
-/** Shown on home until the user customizes. Document processing and approvals only. */
+/** Shown on home until the user customizes. */
 export const DEFAULT_VISIBLE_SECTIONS: DashboardSectionId[] = [
-  "unreadNotifications",
-  "pendingApprovals",
+  "notifications",
   "myWork",
   "operations",
 ];
+
+/** Retired section IDs → the widget they were merged into. */
+export const SECTION_ALIASES: Record<string, DashboardSectionId> = {
+  unreadNotifications: "notifications",
+  pendingApprovals: "myWork",
+  bankBalances: "cashPosition",
+  automationTrend: "operations",
+  approvalTrend: "operations",
+  documentSource: "operations",
+};
 
 function withMobileCore(sections: DashboardSectionId[]): DashboardSectionId[] {
   const rest = sections.filter((id) => !DEFAULT_VISIBLE_SECTIONS.includes(id));
@@ -63,10 +72,8 @@ export const LAYOUT_SECTIONS: Record<DashboardLayoutKey, DashboardSectionId[]> =
     "topVendors",
     "topCustomers",
     "sync",
-    "automationTrend",
     "aiAccuracy",
     "planUsage",
-    "notifications",
     "activityFeed",
     "team",
     "ledger",
@@ -89,7 +96,6 @@ export const LAYOUT_SECTIONS: Record<DashboardLayoutKey, DashboardSectionId[]> =
     "topVendors",
     "topCustomers",
     "sync",
-    "automationTrend",
     "aiAccuracy",
     "activityFeed",
     "ledger",
@@ -100,7 +106,7 @@ export const LAYOUT_SECTIONS: Record<DashboardLayoutKey, DashboardSectionId[]> =
     "actionInbox",
     "quickActions",
     "plSnapshot",
-    "bankBalances",
+    "cashPosition",
     "balanceSheet",
     "cashFlowTrend",
     "priorYearBenchmark",
@@ -109,19 +115,17 @@ export const LAYOUT_SECTIONS: Record<DashboardLayoutKey, DashboardSectionId[]> =
     "topCustomers",
     "currencyConverter",
     "tdsCalculator",
-    "automationTrend",
     "aiAccuracy",
   ]),
   analytics: withMobileCore([
     "actionInbox",
     "plSnapshot",
-    "bankBalances",
+    "cashPosition",
     "balanceSheet",
     "cashFlowTrend",
     "priorYearBenchmark",
     "topVendors",
     "topCustomers",
-    "automationTrend",
     "aiAccuracy",
     "team",
   ]),
@@ -135,7 +139,6 @@ export const LAYOUT_SECTIONS: Record<DashboardLayoutKey, DashboardSectionId[]> =
     "priorYearBenchmark",
     "topVendors",
     "topCustomers",
-    "automationTrend",
     "aiAccuracy",
     "sync",
     "ledger",
@@ -143,8 +146,6 @@ export const LAYOUT_SECTIONS: Record<DashboardLayoutKey, DashboardSectionId[]> =
 };
 
 export const SECTION_LABELS: Record<string, string> = {
-  unreadNotifications: "Unread notifications",
-  pendingApprovals: "Pending approvals",
   actionInbox: "Needs Attention",
   myWork: "My Approvals",
   quickActions: "Quick Actions",
@@ -153,7 +154,6 @@ export const SECTION_LABELS: Record<string, string> = {
   bankReconciliation: "Bank Reconciliation",
   balanceSheet: "Balance Sheet",
   cashFlowTrend: "Cash Flow Trend",
-  bankBalances: "Bank Balances",
   workingCapital: "Working Capital",
   compliance: "Compliance Calendar",
   tdsSummary: "TDS Summary",
@@ -165,9 +165,6 @@ export const SECTION_LABELS: Record<string, string> = {
   topVendors: "Top Vendors by Spend",
   topCustomers: "Top Customers by Revenue",
   sync: "ERP Sync",
-  automationTrend: "Automation Efficiency",
-  approvalTrend: "Approval Trend",
-  documentSource: "Document Source",
   aiAccuracy: "AI Ledger Accuracy",
   planUsage: "Plan Usage",
   notifications: "Notifications",
@@ -177,8 +174,6 @@ export const SECTION_LABELS: Record<string, string> = {
 };
 
 export const SECTION_ICONS: Record<string, IconName> = {
-  unreadNotifications: "notifications-outline",
-  pendingApprovals: "checkmark-done-outline",
   actionInbox: "alert-circle-outline",
   myWork: "checkmark-done-outline",
   quickActions: "flash-outline",
@@ -187,7 +182,6 @@ export const SECTION_ICONS: Record<string, IconName> = {
   bankReconciliation: "git-compare-outline",
   balanceSheet: "scale-outline",
   cashFlowTrend: "swap-vertical-outline",
-  bankBalances: "card-outline",
   workingCapital: "swap-horizontal-outline",
   compliance: "calendar-outline",
   tdsSummary: "calculator-outline",
@@ -199,9 +193,6 @@ export const SECTION_ICONS: Record<string, IconName> = {
   topVendors: "storefront-outline",
   topCustomers: "people-outline",
   sync: "sync-outline",
-  automationTrend: "trophy-outline",
-  approvalTrend: "checkmark-circle-outline",
-  documentSource: "pie-chart-outline",
   aiAccuracy: "sparkles-outline",
   planUsage: "speedometer-outline",
   notifications: "notifications-outline",
@@ -216,7 +207,6 @@ export const WEB_PATHS: Record<string, string> = {
   currencyConverter: "/",
   tdsCalculator: "/",
   planUsage: "/company/subscription",
-  bankBalances: "/banking",
   cashPosition: "/banking",
   bankReconciliation: "/banking",
   inventorySummary: "/inventory",

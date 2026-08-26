@@ -4,8 +4,6 @@ export type DashboardLayoutKey =
   "executive" | "accountant" | "operator" | "sales" | "analytics" | "auditor";
 
 export type DashboardSectionId =
-  | "unreadNotifications"
-  | "pendingApprovals"
   | "actionInbox"
   | "myWork"
   | "quickActions"
@@ -14,7 +12,6 @@ export type DashboardSectionId =
   | "bankReconciliation"
   | "balanceSheet"
   | "cashFlowTrend"
-  | "bankBalances"
   | "workingCapital"
   | "compliance"
   | "tdsSummary"
@@ -26,9 +23,6 @@ export type DashboardSectionId =
   | "topVendors"
   | "topCustomers"
   | "sync"
-  | "automationTrend"
-  | "approvalTrend"
-  | "documentSource"
   | "aiAccuracy"
   | "planUsage"
   | "notifications"
@@ -149,7 +143,6 @@ export type CompleteDashboard = {
     total_approved?: number;
     avg_approval_time_hours?: number;
     approval_rate?: number;
-    approval_trends?: { day?: string; approved?: number }[];
   };
   bank_reconciliation_metrics?: {
     reconciliation_rate?: number;
@@ -167,10 +160,6 @@ export type CompleteDashboard = {
     ar_docs?: { total_processed?: number };
   };
   automation_efficiency_metrics?: { automation_rate?: number };
-  processing_efficiency?: {
-    overall_efficiency?: number;
-    efficiency_trend?: { date?: string; automation_rate?: number }[];
-  };
   alert_notifications?: {
     alerts?: {
       type?: string;

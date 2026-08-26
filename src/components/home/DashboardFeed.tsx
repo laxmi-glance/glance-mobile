@@ -13,7 +13,6 @@ import { formatInr } from "../../utils/money";
 import { radius, space, useAppTheme, useThemedStyles, type ThemeTokens } from "../../theme";
 import type { CompleteDashboard, DashboardPerms, DashboardSecondary } from "../../types/dashboard";
 import WidgetCard, { WidgetEmpty, WidgetSkeleton } from "./WidgetCard";
-import HomeActionItems from "./HomeActionItems";
 import type { IconName } from "../../config/features";
 
 export type HomeNavigation = {
@@ -33,7 +32,6 @@ type Props = {
   periodLabel: string;
   loading: boolean;
   unread: number;
-  pendingCount: number;
   navigation: HomeNavigation;
 };
 
@@ -150,7 +148,6 @@ export default function DashboardFeed({
   periodLabel,
   loading,
   unread,
-  pendingCount,
   navigation,
 }: Props) {
   const { colors } = useAppTheme();
@@ -173,44 +170,37 @@ export default function DashboardFeed({
     }
 
     switch (sectionId) {
-      case "unreadNotifications":
+      case "notifications": {
+        const items = secondary.notifications.data;
         return (
-          <HomeActionItems
-            actions={[
-              {
-                key: "unread",
-                icon: "notifications-outline",
-                title:
+          <WidgetCard
+            title={unread > 0 ? `Notifications (${unread} unread)` : "Notifications"}
+            icon="notifications-outline"
+            onPress={navigation.openNotifications}
+          >
+            {items.length === 0 ? (
+              <WidgetEmpty
+                text={
                   unread > 0
-                    ? `You have ${unread} unread notification${unread === 1 ? "" : "s"}`
-                    : "No unread notifications",
-                subtitle: unread > 0 ? "Read them now" : "You're all caught up",
-                tone: "brand",
-                onPress: navigation.openNotifications,
-              },
-            ]}
-          />
+                    ? "Open to read your unread notifications."
+                    : "No recent notifications."
+                }
+              />
+            ) : (
+              items.map((item) => (
+                <View key={item.id} style={styles.listRow}>
+                  <View style={styles.listCopy}>
+                    <Text style={styles.listTitle} numberOfLines={1}>
+                      {item.title || item.message || "Notification"}
+                    </Text>
+                    <Text style={styles.listMeta}>{formatDateTime(item.timestamp)}</Text>
+                  </View>
+                </View>
+              ))
+            )}
+          </WidgetCard>
         );
-
-      case "pendingApprovals":
-        return (
-          <HomeActionItems
-            actions={[
-              {
-                key: "pending",
-                icon: "checkmark-done-outline",
-                title:
-                  pendingCount > 0
-                    ? `You have ${pendingCount} document${pendingCount === 1 ? "" : "s"} pending approval`
-                    : "No documents pending approval",
-                subtitle: pendingCount > 0 ? "Review and approve them now" : "You're all caught up",
-                tone: "warning",
-                onPress: navigation.openDocuments,
-              },
-            ]}
-          />
-        );
-
+      }
       case "actionInbox": {
         const items = secondary.actionItems.data;
         return (
@@ -223,32 +213,6 @@ export default function DashboardFeed({
                   <View style={styles.listCopy}>
                     <Text style={styles.listTitle}>{item.title}</Text>
                     {item.subtitle ? <Text style={styles.listMeta}>{item.subtitle}</Text> : null}
-                  </View>
-                </View>
-              ))
-            )}
-          </WidgetCard>
-        );
-      }
-
-      case "notifications": {
-        const items = secondary.notifications.data;
-        return (
-          <WidgetCard
-            title="Notifications"
-            icon="notifications-outline"
-            onPress={navigation.openNotifications}
-          >
-            {items.length === 0 ? (
-              <WidgetEmpty text="No recent notifications." />
-            ) : (
-              items.map((item) => (
-                <View key={item.id} style={styles.listRow}>
-                  <View style={styles.listCopy}>
-                    <Text style={styles.listTitle} numberOfLines={1}>
-                      {item.title || item.message || "Notification"}
-                    </Text>
-                    <Text style={styles.listMeta}>{formatDateTime(item.timestamp)}</Text>
                   </View>
                 </View>
               ))
@@ -363,6 +327,21 @@ export default function DashboardFeed({
                 <Text style={styles.meta}>
                   Across {accounts.length} bank account{accounts.length === 1 ? "" : "s"}
                 </Text>
+                {accounts.slice(0, 5).map((acc) => (
+                  <View key={acc.id} style={styles.listRow}>
+                    <View style={styles.listCopy}>
+                      <Text style={styles.listTitle} numberOfLines={1}>
+                        {acc.account_name || acc.bank_name || "Account"}
+                      </Text>
+                      <Text style={styles.listMeta}>
+                        {[acc.bank_name, acc.account_type].filter(Boolean).join(" · ")}
+                      </Text>
+                    </View>
+                    <Text style={styles.listAmount}>
+                      {formatInr(acc.current_balance ?? acc.opening_balance, true)}
+                    </Text>
+                  </View>
+                ))}
               </>
             )}
           </WidgetCard>
@@ -485,36 +464,6 @@ export default function DashboardFeed({
                 },
               ]}
             />
-          </WidgetCard>
-        );
-      }
-
-      case "bankBalances": {
-        if (!perms.canViewBanking) {
-          return null;
-        }
-        const accounts = secondary.bankAccounts.data.slice(0, 5);
-        return (
-          <WidgetCard title="Bank balances" icon="card-outline">
-            {accounts.length === 0 ? (
-              <WidgetEmpty text="No bank accounts found." />
-            ) : (
-              accounts.map((acc) => (
-                <View key={acc.id} style={styles.listRow}>
-                  <View style={styles.listCopy}>
-                    <Text style={styles.listTitle} numberOfLines={1}>
-                      {acc.account_name || acc.bank_name || "Account"}
-                    </Text>
-                    <Text style={styles.listMeta}>
-                      {[acc.bank_name, acc.account_type].filter(Boolean).join(" · ")}
-                    </Text>
-                  </View>
-                  <Text style={styles.listAmount}>
-                    {formatInr(acc.current_balance ?? acc.opening_balance, true)}
-                  </Text>
-                </View>
-              ))
-            )}
           </WidgetCard>
         );
       }
@@ -658,6 +607,10 @@ export default function DashboardFeed({
         const ar = complete?.document_processing_metrics?.ar_docs;
         const processed = num(ap?.total_processed) + num(ar?.total_processed);
         const stats = secondary.processingStats.data;
+        const email = num(ap?.email_received);
+        const upload = num(ap?.uploaded);
+        const manual = num(ap?.manually_created);
+        const sourceTotal = email + upload + manual;
         return (
           <WidgetCard
             title="Document processing"
@@ -681,6 +634,17 @@ export default function DashboardFeed({
               <Text style={styles.meta}>
                 Queue · {num(stats.processing)} processing · {num(stats.failed)} failed
               </Text>
+            ) : null}
+            {sourceTotal > 0 ? (
+              <View style={styles.nestedBlock}>
+                <StatGrid
+                  items={[
+                    { label: "Email", value: String(email) },
+                    { label: "Upload", value: String(upload) },
+                    { label: "Manual", value: String(manual) },
+                  ]}
+                />
+              </View>
             ) : null}
           </WidgetCard>
         );
@@ -720,61 +684,6 @@ export default function DashboardFeed({
             <Text style={styles.meta}>
               {pending > 0 ? "Items waiting in the sync queue" : "No pending sync jobs"}
             </Text>
-          </WidgetCard>
-        );
-      }
-
-      case "automationTrend": {
-        const trend = complete?.processing_efficiency?.efficiency_trend || [];
-        const latest = trend[trend.length - 1];
-        const rate = num(
-          latest?.automation_rate ?? complete?.automation_efficiency_metrics?.automation_rate
-        );
-        return (
-          <WidgetCard title="Automation efficiency" icon="trophy-outline">
-            <Text style={styles.hero}>{rate.toFixed(1)}%</Text>
-            <Text style={styles.meta}>Latest automation rate</Text>
-            <ProgressBar value={rate} />
-          </WidgetCard>
-        );
-      }
-
-      case "approvalTrend": {
-        const trend = complete?.approval_workflow_metrics?.approval_trends || [];
-        const latest = trend[trend.length - 1];
-        return (
-          <WidgetCard title="Approval trend" icon="checkmark-circle-outline">
-            <Text style={styles.hero}>
-              {String(latest?.approved ?? complete?.approval_workflow_metrics?.total_approved ?? 0)}
-            </Text>
-            <Text style={styles.meta}>
-              {latest?.day ? `Approved on ${latest.day}` : "Approved in this period"}
-            </Text>
-          </WidgetCard>
-        );
-      }
-
-      case "documentSource": {
-        const ap = complete?.document_processing_metrics?.ap_docs;
-        const email = num(ap?.email_received);
-        const upload = num(ap?.uploaded);
-        const manual = num(ap?.manually_created);
-        if (email + upload + manual === 0) {
-          return (
-            <WidgetCard title="Document source" icon="pie-chart-outline">
-              <WidgetEmpty text="No document source data yet." />
-            </WidgetCard>
-          );
-        }
-        return (
-          <WidgetCard title="Document source" icon="pie-chart-outline">
-            <StatGrid
-              items={[
-                { label: "Email", value: String(email) },
-                { label: "Upload", value: String(upload) },
-                { label: "Manual", value: String(manual) },
-              ]}
-            />
           </WidgetCard>
         );
       }
@@ -920,6 +829,9 @@ function createStyles({ colors, type }: ThemeTokens) {
       ...type.caption,
       marginTop: 4,
       color: colors.textSecondary,
+    },
+    nestedBlock: {
+      marginTop: 12,
     },
     track: {
       height: 6,

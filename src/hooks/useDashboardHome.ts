@@ -11,7 +11,6 @@ import {
 import authService from "../services/auth.service";
 import companyService from "../services/company.service";
 import dashboardService from "../services/dashboard.service";
-import financialDocumentService from "../services/financialDocument.service";
 import preferencesService from "../services/preferences.service";
 import tenantService from "../services/tenant.service";
 import { useAppTheme } from "../theme";
@@ -84,7 +83,6 @@ export function useDashboardHome() {
   const [savingLayout, setSavingLayout] = useState(false);
   const [complete, setComplete] = useState<CompleteDashboard | null>(null);
   const [secondary, setSecondary] = useState<DashboardSecondary>(emptySecondary);
-  const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -132,12 +130,11 @@ export function useDashboardHome() {
         setPeriodState(activePeriod);
       }
 
-      const [me, selected, company, prefs, stats, snapshot] = await Promise.all([
+      const [me, selected, company, prefs, snapshot] = await Promise.all([
         authService.getProfile().catch(() => null),
         tenantService.getSelectedTenant(),
         companyService.getCurrent(),
         preferencesService.get().catch(() => ({}) as UserPreferences),
-        financialDocumentService.getApStats().catch(() => null),
         dashboardService.getComplete().catch(() => null),
       ]);
 
@@ -146,7 +143,6 @@ export function useDashboardHome() {
       setLogoUri(
         company?.logo || company?.logo_url || selected?.logo || selected?.logo_url || null
       );
-      setPendingCount(stats?.pending || 0);
       setComplete(snapshot);
       void applyFromPreferences(prefs, fetchEpoch);
 
@@ -186,7 +182,7 @@ export function useDashboardHome() {
             .catch(() => assign("myPendingApprovals", { loading: false, data: null }))
         );
       }
-      if ((visible.has("cashPosition") || visible.has("bankBalances")) && perms.canViewBanking) {
+      if (visible.has("cashPosition") && perms.canViewBanking) {
         tasks.push(
           dashboardService
             .getBankAccounts()
@@ -412,7 +408,6 @@ export function useDashboardHome() {
     logoUri,
     greeting,
     unread,
-    pendingCount,
     period,
     periodLabel: getPeriodLabel(period),
     cyclePeriod,

@@ -66,7 +66,6 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
             periodLabel={home.periodLabel}
             loading={home.loading}
             unread={home.unread}
-            pendingCount={home.pendingCount}
             navigation={{
               openNotifications: () => navigation.navigate("Notifications"),
               openDocuments: () => navigation.navigate("AP"),
