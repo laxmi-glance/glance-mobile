@@ -26,9 +26,11 @@ import { apiErrorMessage } from "../utils/errors";
 import { useRbac } from "../hooks/useRbac";
 import { isProcessingRow } from "../utils/approval";
 import { mergeUniqueById } from "../utils/lists";
-import { colors, radius, space } from "../theme";
+import { radius, space, useAppTheme, useThemedStyles, type ThemeTokens } from "../theme";
 
 export default function ApListScreen({ navigation }: ApScreenProps) {
+  const { colors } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
   const { canViewAp, config, loading: rbacLoading } = useRbac();
   const [documents, setDocuments] = useState<FinancialDocumentListItem[]>([]);
   const [stats, setStats] = useState<FinancialDocumentStats | null>(null);
@@ -164,7 +166,7 @@ export default function ApListScreen({ navigation }: ApScreenProps) {
         <TextInput
           style={styles.search}
           placeholder="Search vendor or invoice"
-          placeholderTextColor={colors.textMuted}
+          placeholderTextColor={colors.textPlaceholder}
           value={search}
           onChangeText={setSearch}
           returnKeyType="search"
@@ -222,6 +224,8 @@ function StatChip({
   active?: boolean;
   onPress: () => void;
 }) {
+  const { colors } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
   return (
     <TouchableOpacity
       style={[styles.statChip, active && styles.statChipActive]}
@@ -244,73 +248,72 @@ function StatChip({
   );
 }
 
-const styles = StyleSheet.create({
-  statsRow: {
-    flexDirection: "row",
-    paddingHorizontal: space.lg,
-    paddingTop: space.md,
-    gap: space.sm,
-  },
-  statChip: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingVertical: 10,
-    alignItems: "center",
-  },
-  statChipActive: {
-    backgroundColor: colors.brandSoft,
-    borderColor: colors.brand,
-  },
-  statValue: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: colors.text,
-  },
-  statValueActive: {
-    color: colors.brand,
-  },
-  statLabel: {
-    fontSize: 11,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  statLabelActive: {
-    color: colors.brand,
-    fontWeight: "700",
-  },
-  searchRow: {
-    marginHorizontal: space.lg,
-    marginTop: space.md,
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  search: {
-    flex: 1,
-    paddingVertical: 10,
-    fontSize: 15,
-    color: colors.text,
-  },
-  list: {
-    paddingHorizontal: space.lg,
-    paddingTop: space.md,
-    paddingBottom: space.xxxl,
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: colors.overlay,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  loadingMore: {
-    marginVertical: space.lg,
-  },
-});
+function createStyles({ colors, type }: ThemeTokens) {
+  return {
+    statsRow: {
+      flexDirection: "row",
+      paddingHorizontal: space.lg,
+      paddingTop: space.md,
+      gap: space.sm,
+    },
+    statChip: {
+      flex: 1,
+      backgroundColor: colors.surface,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingVertical: 10,
+      alignItems: "center",
+    },
+    statChipActive: {
+      backgroundColor: colors.brandSoft,
+      borderColor: colors.brand,
+    },
+    statValue: {
+      ...type.heading,
+      color: colors.text,
+    },
+    statValueActive: {
+      color: colors.brand,
+    },
+    statLabel: {
+      ...type.overline,
+      color: colors.textSecondary,
+      marginTop: 2,
+    },
+    statLabelActive: {
+      color: colors.brand,
+    },
+    searchRow: {
+      marginHorizontal: space.lg,
+      marginTop: space.md,
+      backgroundColor: colors.surface,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingHorizontal: 12,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    search: {
+      ...type.input,
+      flex: 1,
+      paddingVertical: 10,
+    },
+    list: {
+      paddingHorizontal: space.lg,
+      paddingTop: space.md,
+      paddingBottom: space.xxxl,
+    },
+    overlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: colors.overlay,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    loadingMore: {
+      marginVertical: space.lg,
+    },
+  };
+}

@@ -1,7 +1,7 @@
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { colors, space } from "../theme";
+import { space, useAppTheme, useThemedStyles, type ThemeTokens } from "../theme";
 import type { IconName } from "../config/features";
 
 type Props = {
@@ -11,6 +11,8 @@ type Props = {
 };
 
 export default function EmptyState({ icon = "file-tray-outline", title, hint }: Props) {
+  const { colors } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
   return (
     <View style={styles.wrap}>
       <View style={styles.iconWrap}>
@@ -22,32 +24,31 @@ export default function EmptyState({ icon = "file-tray-outline", title, hint }: 
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: {
-    alignItems: "center",
-    paddingHorizontal: space.xxl,
-    paddingVertical: 48,
-  },
-  iconWrap: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.brandSoft,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: space.md,
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: colors.text,
-    textAlign: "center",
-  },
-  hint: {
-    marginTop: space.sm,
-    fontSize: 14,
-    color: colors.textMuted,
-    textAlign: "center",
-    lineHeight: 20,
-  },
-});
+function createStyles({ colors, type }: ThemeTokens) {
+  return {
+    wrap: {
+      alignItems: "center" as const,
+      paddingHorizontal: space.xxl,
+      paddingVertical: 48,
+    },
+    iconWrap: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: colors.brandSoft,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+      marginBottom: space.md,
+    },
+    title: {
+      ...type.subtitle,
+      textAlign: "center" as const,
+    },
+    hint: {
+      ...type.meta,
+      marginTop: space.sm,
+      color: colors.textMuted,
+      textAlign: "center" as const,
+    },
+  };
+}

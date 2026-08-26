@@ -1,51 +1,21 @@
-import { Platform, type TextStyle, type ViewStyle } from "react-native";
-import { colors } from "./colors";
+import { colors, lightColors, darkColors, type AppColors } from "./colors";
+import {
+  type,
+  fonts,
+  fontSize,
+  defaultTextStyle,
+  navigationFonts,
+  makeType,
+  type TypeScale,
+} from "./typography";
+import { ThemeProvider, useAppTheme, THEME_AUTO, THEME_DARK, THEME_LIGHT } from "./ThemeContext";
+import { useThemedStyles, space, radius, shadow, makeShadow, type ThemeTokens } from "./styles";
 
-export { colors };
-
-export const space = {
-  xs: 4,
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 20,
-  xxl: 24,
-  xxxl: 32,
-};
-
-export const radius = {
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 20,
-  full: 999,
-};
-
-export const type = {
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: colors.textHeading,
-    letterSpacing: -0.4,
-  } as TextStyle,
-  heading: { fontSize: 20, fontWeight: "700", color: colors.textHeading } as TextStyle,
-  subtitle: { fontSize: 15, fontWeight: "600", color: colors.text } as TextStyle,
-  body: { fontSize: 15, color: colors.text, lineHeight: 22 } as TextStyle,
-  meta: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 } as TextStyle,
-  caption: { fontSize: 12, color: colors.textMuted, fontWeight: "600" } as TextStyle,
-};
-
-export const shadow = {
-  card: Platform.select<ViewStyle>({
-    ios: {
-      shadowColor: "#13003E",
-      shadowOpacity: 0.08,
-      shadowRadius: 12,
-      shadowOffset: { width: 0, height: 4 },
-    },
-    android: {
-      elevation: 2,
-    },
-    default: {},
-  }),
-};
+export { colors, lightColors, darkColors };
+export type { AppColors };
+export { type, fonts, fontSize, defaultTextStyle, navigationFonts, makeType };
+export type { TypeScale };
+export { ThemeProvider, useAppTheme, THEME_AUTO, THEME_DARK, THEME_LIGHT };
+export { useThemedStyles, space, radius, shadow, makeShadow };
+export type { ThemeTokens };
+export type { ThemeMode, ResolvedTheme } from "./ThemeContext";

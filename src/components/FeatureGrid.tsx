@@ -1,15 +1,16 @@
 import React from "react";
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { APP_FEATURES, comingSoonCopy, type AppFeature } from "../config/features";
 import { useUnreadCount } from "../hooks/useUnreadCount";
-import { colors, radius, space } from "../theme";
+import { radius, space, useAppTheme, useThemedStyles, type ThemeTokens } from "../theme";
 
 type Props = {
   onOpenFeature: (feature: AppFeature) => void;
 };
 
 export default function FeatureGrid({ onOpenFeature }: Props) {
+  const styles = useThemedStyles(createStyles);
   const unread = useUnreadCount();
 
   return (
@@ -35,6 +36,8 @@ function FeatureTile({
   unread: number;
   onOpenFeature: (feature: AppFeature) => void;
 }) {
+  const { colors } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
   const handlePress = () => {
     if (feature.available && (feature.tab || feature.stack)) {
       onOpenFeature(feature);
@@ -76,74 +79,69 @@ function FeatureTile({
   );
 }
 
-const styles = StyleSheet.create({
-  grid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    rowGap: space.md,
-  },
-  tile: {
-    width: "48.5%",
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: space.lg,
-    minHeight: 132,
-  },
-  tileTop: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    marginBottom: space.md,
-  },
-  iconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: colors.brandSoft,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  countBadge: {
-    minWidth: 24,
-    height: 24,
-    paddingHorizontal: 7,
-    borderRadius: 12,
-    backgroundColor: colors.danger,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  countText: {
-    color: colors.white,
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  iconMuted: {
-    backgroundColor: colors.surfaceMuted,
-  },
-  title: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: colors.textHeading,
-  },
-  subtitle: {
-    marginTop: 4,
-    fontSize: 12,
-    color: colors.textSecondary,
-    lineHeight: 16,
-  },
-  subtitleAlert: {
-    color: colors.danger,
-    fontWeight: "600",
-  },
-  soon: {
-    marginTop: space.sm,
-    fontSize: 11,
-    fontWeight: "700",
-    color: colors.brand,
-    textTransform: "uppercase",
-    letterSpacing: 0.4,
-  },
-});
+function createStyles({ colors, type }: ThemeTokens) {
+  return {
+    grid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      justifyContent: "space-between",
+      rowGap: space.md,
+    },
+    tile: {
+      width: "48.5%",
+      backgroundColor: colors.surface,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: space.lg,
+      minHeight: 132,
+    },
+    tileTop: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      marginBottom: space.md,
+    },
+    iconWrap: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      backgroundColor: colors.brandSoft,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    countBadge: {
+      minWidth: 24,
+      height: 24,
+      paddingHorizontal: 7,
+      borderRadius: 12,
+      backgroundColor: colors.danger,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    countText: {
+      ...type.caption,
+      color: colors.white,
+    },
+    iconMuted: {
+      backgroundColor: colors.surfaceMuted,
+    },
+    title: {
+      ...type.cardTitle,
+    },
+    subtitle: {
+      ...type.caption,
+      marginTop: 4,
+      color: colors.textSecondary,
+    },
+    subtitleAlert: {
+      color: colors.danger,
+    },
+    soon: {
+      ...type.overline,
+      marginTop: space.sm,
+      color: colors.brand,
+      textTransform: "uppercase",
+    },
+  };
+}

@@ -1,12 +1,12 @@
 import React from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import StatusBadge from "./StatusBadge";
 import type { FinancialDocumentListItem } from "../types/models";
 import { approvalLabel, approvalTone, isProcessingRow, vendorName } from "../utils/approval";
 import { formatMoney } from "../utils/money";
 import { formatDateTime } from "../utils/dates";
-import { colors, radius, space } from "../theme";
+import { radius, space, useAppTheme, useThemedStyles, type ThemeTokens } from "../theme";
 
 type Props = {
   item: FinancialDocumentListItem;
@@ -14,6 +14,8 @@ type Props = {
 };
 
 export default function ApDocumentRow({ item, onPress }: Props) {
+  const { colors } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
   const processing = isProcessingRow(item);
   const title = item.invoice_number || item.file_name || "Untitled document";
 
@@ -56,59 +58,57 @@ export default function ApDocumentRow({ item, onPress }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: space.lg,
-    marginBottom: space.md,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: space.md,
-  },
-  iconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: colors.brandSoft,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  body: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: space.sm,
-    marginBottom: 4,
-  },
-  title: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: "700",
-    color: colors.text,
-  },
-  vendor: {
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
-  footer: {
-    marginTop: 8,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  amount: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: colors.textHeading,
-  },
-  meta: {
-    fontSize: 12,
-    color: colors.textMuted,
-  },
-});
+function createStyles({ colors, type }: ThemeTokens) {
+  return {
+    card: {
+      backgroundColor: colors.surface,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: space.lg,
+      marginBottom: space.md,
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: space.md,
+    },
+    iconWrap: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      backgroundColor: colors.brandSoft,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    body: {
+      flex: 1,
+    },
+    header: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      gap: space.sm,
+      marginBottom: 4,
+    },
+    title: {
+      ...type.subtitle,
+      flex: 1,
+    },
+    vendor: {
+      ...type.callout,
+      color: colors.textSecondary,
+    },
+    footer: {
+      marginTop: 8,
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+    amount: {
+      ...type.subtitle,
+      color: colors.textHeading,
+    },
+    meta: {
+      ...type.caption,
+    },
+  };
+}

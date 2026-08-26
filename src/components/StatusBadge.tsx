@@ -1,7 +1,7 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text } from "react-native";
 import { statusColor, type StatusTone } from "../utils/documentStatus";
-import { radius } from "../theme";
+import { radius, useAppTheme, useThemedStyles, type ThemeTokens } from "../theme";
 
 interface Props {
   label: string;
@@ -9,7 +9,9 @@ interface Props {
 }
 
 export default function StatusBadge({ label, tone }: Props) {
-  const color = statusColor(tone);
+  const { colors } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
+  const color = statusColor(tone, colors);
   return (
     <View style={[styles.badge, { backgroundColor: `${color}18`, borderColor: `${color}44` }]}>
       <Text style={[styles.text, { color }]}>{label}</Text>
@@ -17,16 +19,18 @@ export default function StatusBadge({ label, tone }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    maxWidth: 148,
-  },
-  text: {
-    fontSize: 11,
-    fontWeight: "700",
-  },
-});
+function createStyles({ colors, type }: ThemeTokens) {
+  return {
+    badge: {
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: radius.sm,
+      borderWidth: 1,
+      maxWidth: 148,
+    },
+    text: {
+      ...type.overline,
+      letterSpacing: 0.2,
+    },
+  };
+}

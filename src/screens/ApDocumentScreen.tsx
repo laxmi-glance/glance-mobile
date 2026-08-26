@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { View, Text, StyleSheet, ActivityIndicator, ScrollView, Alert } from "react-native";
+import { View, Text, ActivityIndicator, ScrollView, Alert } from "react-native";
 import { ApDocumentScreenProps } from "../types/navigation";
 import financialDocumentService from "../services/financialDocument.service";
 import type { FinancialDocumentDetail } from "../types/models";
@@ -20,11 +20,13 @@ import {
   vendorName,
 } from "../utils/approval";
 import { useRbac } from "../hooks/useRbac";
-import { colors, space } from "../theme";
+import { space, useAppTheme, useThemedStyles, type ThemeTokens } from "../theme";
 import Screen from "../components/Screen";
 import PageHeader from "../components/PageHeader";
 
 export default function ApDocumentScreen({ route, navigation }: ApDocumentScreenProps) {
+  const { colors } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
   const { documentId } = route.params;
   const rbac = useRbac();
   const [document, setDocument] = useState<FinancialDocumentDetail | null>(null);
@@ -289,6 +291,7 @@ function amountBreakdownRows(
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {
+  const styles = useThemedStyles(createStyles);
   return (
     <View style={styles.row}>
       <Text style={styles.label}>{label}</Text>
@@ -297,129 +300,116 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  content: {
-    padding: space.lg,
-    paddingBottom: 40,
-  },
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: colors.background,
-  },
-  headerCard: {
-    marginBottom: space.md,
-  },
-  vendor: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: colors.brand,
-    textTransform: "uppercase",
-    letterSpacing: 0.4,
-  },
-  invoice: {
-    marginTop: 6,
-    fontSize: 20,
-    fontWeight: "700",
-    color: colors.textHeading,
-  },
-  amount: {
-    marginTop: 10,
-    fontSize: 28,
-    fontWeight: "700",
-    color: colors.textHeading,
-  },
-  heroHint: {
-    marginTop: 2,
-    fontSize: 13,
-    fontWeight: "600",
-    color: colors.textSecondary,
-  },
-  metaLine: {
-    marginTop: space.sm,
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
-  dueLine: {
-    marginTop: 4,
-    fontSize: 13,
-    fontWeight: "600",
-    color: colors.text,
-  },
-  badgeRow: {
-    marginTop: space.md,
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  section: {
-    marginBottom: space.md,
-  },
-  previewCard: {
-    overflow: "hidden",
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: colors.textHeading,
-    marginBottom: space.sm,
-  },
-  previewTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: colors.textHeading,
-    paddingHorizontal: space.lg,
-    paddingTop: space.lg,
-    paddingBottom: space.sm,
-  },
-  row: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: space.lg,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  label: {
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
-  value: {
-    flex: 1,
-    fontSize: 14,
-    color: colors.text,
-    fontWeight: "500",
-    textAlign: "right",
-  },
-  line: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: space.md,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  lineDesc: {
-    flex: 1,
-    fontSize: 14,
-    color: colors.text,
-  },
-  lineAmt: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: colors.textHeading,
-  },
-  hint: {
-    marginTop: space.md,
-    marginBottom: space.md,
-    textAlign: "center",
-    fontSize: 13,
-    color: colors.textSecondary,
-    lineHeight: 18,
-  },
-});
+function createStyles({ colors, type }: ThemeTokens) {
+  return {
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    content: {
+      padding: space.lg,
+      paddingBottom: 40,
+    },
+    center: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      backgroundColor: colors.background,
+    },
+    headerCard: {
+      marginBottom: space.md,
+    },
+    vendor: {
+      ...type.overline,
+      color: colors.brand,
+      textTransform: "uppercase",
+    },
+    invoice: {
+      ...type.title,
+      marginTop: 6,
+      fontSize: 20,
+      lineHeight: 26,
+    },
+    amount: {
+      ...type.numericLg,
+      marginTop: 10,
+    },
+    heroHint: {
+      ...type.label,
+      marginTop: 2,
+      color: colors.textSecondary,
+    },
+    metaLine: {
+      ...type.callout,
+      marginTop: space.sm,
+      color: colors.textSecondary,
+    },
+    dueLine: {
+      ...type.label,
+      marginTop: 4,
+    },
+    badgeRow: {
+      marginTop: space.md,
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+    },
+    section: {
+      marginBottom: space.md,
+    },
+    previewCard: {
+      overflow: "hidden",
+    },
+    sectionTitle: {
+      ...type.subtitle,
+      color: colors.textHeading,
+      marginBottom: space.sm,
+    },
+    previewTitle: {
+      ...type.subtitle,
+      color: colors.textHeading,
+      paddingHorizontal: space.lg,
+      paddingTop: space.lg,
+      paddingBottom: space.sm,
+    },
+    row: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      gap: space.lg,
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    label: {
+      ...type.callout,
+      color: colors.textSecondary,
+    },
+    value: {
+      ...type.calloutMedium,
+      flex: 1,
+      textAlign: "right",
+    },
+    line: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      gap: space.md,
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    lineDesc: {
+      ...type.callout,
+      flex: 1,
+    },
+    lineAmt: {
+      ...type.calloutMedium,
+      color: colors.textHeading,
+    },
+    hint: {
+      ...type.meta,
+      marginTop: space.md,
+      marginBottom: space.md,
+      textAlign: "center",
+    },
+  };
+}

@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
-  StyleSheet,
   Alert,
   ActivityIndicator,
   ScrollView,
@@ -21,8 +20,16 @@ import { APP_FEATURES, comingSoonCopy } from "../config/features";
 import Screen from "../components/Screen";
 import PageHeader from "../components/PageHeader";
 import ListRow from "../components/ListRow";
-import { colors, radius, space } from "../theme";
+import {
+  THEME_AUTO,
+  radius,
+  space,
+  useAppTheme,
+  useThemedStyles,
+  type ThemeTokens,
+} from "../theme";
 import { useUnreadCount } from "../hooks/useUnreadCount";
+import ThemePicker from "../components/ThemePicker";
 
 const PROFILE_WEB_URL = `${FRONTEND_URL.replace(/\/+$/, "")}/user/user-profile`;
 const PANEL_BG = "#1C1C1E";
@@ -41,6 +48,8 @@ function formatRole(role?: string | null) {
 
 export default function MoreScreen({ navigation }: MoreScreenProps) {
   const unread = useUnreadCount();
+  const { colors, setTheme } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [loading, setLoading] = useState(true);
@@ -79,6 +88,7 @@ export default function MoreScreen({ navigation }: MoreScreenProps) {
         style: "destructive",
         onPress: async () => {
           await authService.logout();
+          await setTheme(THEME_AUTO, { syncBackend: false });
           navigation.getParent()?.reset({ index: 0, routes: [{ name: "Login" }] });
         },
       },
@@ -185,6 +195,9 @@ export default function MoreScreen({ navigation }: MoreScreenProps) {
           </View>
         </View>
 
+        <Text style={styles.section}>Appearance</Text>
+        <ThemePicker />
+
         <Text style={styles.section}>Workspace</Text>
         <ListRow
           icon="swap-horizontal-outline"
@@ -216,130 +229,124 @@ export default function MoreScreen({ navigation }: MoreScreenProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  content: {
-    paddingHorizontal: space.lg,
-    paddingTop: space.md,
-    paddingBottom: 40,
-  },
-  profile: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: space.md,
-    marginBottom: space.xl,
-    paddingVertical: 16,
-    paddingHorizontal: 14,
-    backgroundColor: PANEL_BG,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: PANEL_BORDER,
-  },
-  profileMain: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
-    minWidth: 0,
-  },
-  avatarRing: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    borderWidth: 2,
-    borderColor: "#C4B5FD",
-    overflow: "hidden",
-    backgroundColor: "#3A3A5C",
-  },
-  avatarPhoto: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-  },
-  avatarFallback: {
-    flex: 1,
-    borderRadius: 22,
-    backgroundColor: "#3A3A5C",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarText: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: colors.white,
-  },
-  identity: {
-    flex: 1,
-    minWidth: 0,
-  },
-  name: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: colors.white,
-    letterSpacing: -0.2,
-  },
-  username: {
-    marginTop: 2,
-    fontSize: 13,
-    fontWeight: "600",
-    color: USERNAME_COLOR,
-  },
-  company: {
-    marginTop: 6,
-    fontSize: 12,
-    color: "#A1A1AA",
-  },
-  roleWrap: {
-    alignSelf: "flex-start",
-    marginTop: 8,
-    backgroundColor: ROLE_BG,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: PANEL_BORDER,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  role: {
-    color: USERNAME_COLOR,
-    fontWeight: "700",
-    fontSize: 11,
-  },
-  toolbar: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 2,
-    padding: 2,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
-    backgroundColor: "rgba(255,255,255,0.04)",
-  },
-  toolbarBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  section: {
-    marginTop: space.sm,
-    marginBottom: space.sm,
-    marginLeft: 4,
-    fontSize: 12,
-    fontWeight: "700",
-    color: colors.textMuted,
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-  },
-  env: {
-    marginTop: space.xl,
-    textAlign: "center",
-    fontSize: 11,
-    color: colors.textMuted,
-  },
-});
+function createStyles({ colors, type }: ThemeTokens) {
+  return {
+    center: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    content: {
+      paddingHorizontal: space.lg,
+      paddingTop: space.md,
+      paddingBottom: 40,
+    },
+    profile: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      gap: space.md,
+      marginBottom: space.xl,
+      paddingVertical: 16,
+      paddingHorizontal: 14,
+      backgroundColor: PANEL_BG,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: PANEL_BORDER,
+    },
+    profileMain: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 12,
+      minWidth: 0,
+    },
+    avatarRing: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      borderWidth: 2,
+      borderColor: "#C4B5FD",
+      overflow: "hidden",
+      backgroundColor: "#3A3A5C",
+    },
+    avatarPhoto: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+    },
+    avatarFallback: {
+      flex: 1,
+      borderRadius: 22,
+      backgroundColor: "#3A3A5C",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    avatarText: {
+      ...type.heading,
+      color: colors.white,
+    },
+    identity: {
+      flex: 1,
+      minWidth: 0,
+    },
+    name: {
+      ...type.subtitle,
+      color: colors.white,
+      letterSpacing: -0.2,
+    },
+    username: {
+      ...type.label,
+      marginTop: 2,
+      color: USERNAME_COLOR,
+    },
+    company: {
+      ...type.caption,
+      marginTop: 6,
+      color: colors.textPlaceholder,
+    },
+    roleWrap: {
+      alignSelf: "flex-start",
+      marginTop: 8,
+      backgroundColor: ROLE_BG,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: PANEL_BORDER,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+    },
+    role: {
+      ...type.overline,
+      color: USERNAME_COLOR,
+    },
+    toolbar: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 2,
+      padding: 2,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: "rgba(255,255,255,0.14)",
+      backgroundColor: "rgba(255,255,255,0.04)",
+    },
+    toolbarBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: 8,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    section: {
+      ...type.overline,
+      marginTop: space.sm,
+      marginBottom: space.sm,
+      marginLeft: 4,
+      textTransform: "uppercase",
+    },
+    env: {
+      ...type.overline,
+      marginTop: space.xl,
+      textAlign: "center",
+    },
+  };
+}

@@ -1,103 +1,148 @@
-import React, { useCallback, useEffect, useState } from "react";
-import { Text, ScrollView, StyleSheet, RefreshControl, Alert } from "react-native";
+import React, { useState } from "react";
+import { ScrollView, Text, TouchableOpacity, View, RefreshControl } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { HomeScreenProps } from "../types/navigation";
 import Screen from "../components/Screen";
-import PageHeader from "../components/PageHeader";
-import FeatureGrid from "../components/FeatureGrid";
-import tenantService from "../services/tenant.service";
-import companyService from "../services/company.service";
-import authService from "../services/auth.service";
-import type { UserProfile } from "../types/models";
-import { apiErrorMessage } from "../utils/errors";
-import { colors, space } from "../theme";
-import type { AppFeature } from "../config/features";
-import { useUnreadCount } from "../hooks/useUnreadCount";
+import BrandLockup from "../components/BrandLockup";
+import HomeWelcomeCard from "../components/home/HomeWelcomeCard";
+import DashboardFeed from "../components/home/DashboardFeed";
+import CustomizeDashboardModal from "../components/home/CustomizeDashboardModal";
+import { useDashboardHome } from "../hooks/useDashboardHome";
+import { radius, space, useAppTheme, useThemedStyles, type ThemeTokens } from "../theme";
 
 export default function HomeScreen({ navigation }: HomeScreenProps) {
-  const unread = useUnreadCount();
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [companyName, setCompanyName] = useState("Workspace");
-  const [logoUri, setLogoUri] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const load = useCallback(async () => {
-    try {
-      const [me, selected, company] = await Promise.all([
-        authService.getProfile().catch(() => null),
-        tenantService.getSelectedTenant(),
-        companyService.getCurrent(),
-      ]);
-      setProfile(me);
-      setCompanyName(company?.name || selected?.company_name || "Workspace");
-      setLogoUri(
-        company?.logo || company?.logo_url || selected?.logo || selected?.logo_url || null
-      );
-    } catch (error: unknown) {
-      Alert.alert("Could not load workspace", apiErrorMessage(error));
-    } finally {
-      setRefreshing(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const displayName =
-    [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") ||
-    profile?.username ||
-    "there";
+  const insets = useSafeAreaInsets();
+  const home = useDashboardHome();
+  const { colors } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
+  const [customizeOpen, setCustomizeOpen] = useState(false);
 
   return (
     <Screen edges={[]}>
-      <PageHeader
-        title={companyName}
-        subtitle={`Hello, ${displayName}`}
-        iconUri={logoUri}
-        supportingIcon="notifications-outline"
-        supportingAccessibilityLabel="Notifications"
-        supportingBadge={unread}
-        onSupportingPress={() => navigation.navigate("Notifications")}
-      />
+      <View style={[styles.brandBar, { paddingTop: insets.top + 6 }]}>
+        <BrandLockup size={30} />
+      </View>
+
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={
           <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              setRefreshing(true);
-              void load();
-            }}
+            refreshing={home.refreshing}
+            onRefresh={home.refresh}
+            tintColor={colors.brand}
           />
         }
       >
-        <Text style={styles.sectionTitle}>Workspace</Text>
-        <FeatureGrid
-          onOpenFeature={(feature: AppFeature) => {
-            if (feature.tab) {
-              navigation.navigate(feature.tab);
-              return;
-            }
-            if (feature.stack === "Notifications" || feature.stack === "Queue") {
-              navigation.navigate(feature.stack);
-            }
-          }}
+        <HomeWelcomeCard
+          greeting={home.greeting}
+          companyName={home.companyName}
+          logoUri={home.logoUri}
         />
+
+        <View style={styles.sectionHead}>
+          <View style={styles.sectionCopy}>
+            <Text style={styles.sectionTitle}>Dashboard</Text>
+            <Text style={styles.sectionHint}>Widgets for this phone layout</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.customizeBtn}
+            onPress={() => setCustomizeOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Customize dashboard"
+          >
+            <Ionicons name="options-outline" size={20} color={colors.brand} />
+          </TouchableOpacity>
+        </View>
+
+        {home.error && !home.complete ? (
+          <Text style={styles.error}>{home.error}</Text>
+        ) : (
+          <DashboardFeed
+            sections={home.sections}
+            complete={home.complete}
+            secondary={home.secondary}
+            perms={home.perms}
+            periodLabel={home.periodLabel}
+            loading={home.loading}
+            unread={home.unread}
+            pendingCount={home.pendingCount}
+            navigation={{
+              openNotifications: () => navigation.navigate("Notifications"),
+              openDocuments: () => navigation.navigate("AP"),
+              openReports: (reportId) => {
+                if (reportId) {
+                  navigation.navigate("Report", { reportId });
+                  return;
+                }
+                navigation.navigate("Reports");
+              },
+              openQueue: () => navigation.navigate("Queue"),
+              openScanner: () => navigation.navigate("Scanner"),
+              openApDocument: (documentId) => navigation.navigate("ApDocument", { documentId }),
+            }}
+          />
+        )}
       </ScrollView>
+      <CustomizeDashboardModal
+        open={customizeOpen}
+        onClose={() => setCustomizeOpen(false)}
+        layoutConfig={home.layoutConfig}
+        defaultSections={home.defaultSections}
+        saving={home.savingLayout}
+        onSave={home.saveLayoutConfig}
+        onReset={async () => {
+          await home.resetLayout();
+        }}
+      />
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  content: {
-    paddingHorizontal: space.xl,
-    paddingTop: space.lg,
-    paddingBottom: 40,
-  },
-  sectionTitle: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: colors.textHeading,
-    marginBottom: space.md,
-  },
-});
+function createStyles({ colors, type }: ThemeTokens) {
+  return {
+    brandBar: {
+      paddingHorizontal: space.lg,
+      paddingBottom: 10,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    content: {
+      paddingHorizontal: space.lg,
+      paddingBottom: 48,
+      gap: space.md,
+    },
+    sectionHead: {
+      marginTop: 4,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+    sectionCopy: {
+      flex: 1,
+      minWidth: 0,
+    },
+    sectionTitle: {
+      ...type.heading,
+      fontSize: 17,
+      lineHeight: 22,
+    },
+    sectionHint: {
+      ...type.caption,
+      marginTop: 2,
+    },
+    customizeBtn: {
+      width: 36,
+      height: 36,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: colors.brandSoft,
+      borderRadius: radius.full,
+    },
+    error: {
+      ...type.callout,
+      color: colors.danger,
+    },
+  };
+}

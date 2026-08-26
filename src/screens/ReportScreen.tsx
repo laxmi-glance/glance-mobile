@@ -1,5 +1,5 @@
 import React from "react";
-import { ActivityIndicator, Linking, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Linking, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { ReportScreenProps } from "../types/navigation";
 import { getReportById } from "../config/reports";
@@ -9,9 +9,11 @@ import Screen from "../components/Screen";
 import PageHeader from "../components/PageHeader";
 import Button from "../components/Button";
 import EmptyState from "../components/EmptyState";
-import { colors, radius, space } from "../theme";
+import { radius, space, useAppTheme, useThemedStyles, type ThemeTokens } from "../theme";
 
 export default function ReportScreen({ route, navigation }: ReportScreenProps) {
+  const { colors } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
   const report = getReportById(route.params.reportId);
   const { allows, loading } = useRbac();
   const canView = allows("reports", "view");
@@ -99,49 +101,47 @@ export default function ReportScreen({ route, navigation }: ReportScreenProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  body: {
-    flex: 1,
-    paddingHorizontal: space.xl,
-    paddingTop: space.xxxl,
-    alignItems: "center",
-  },
-  iconWrap: {
-    width: 64,
-    height: 64,
-    borderRadius: radius.lg,
-    backgroundColor: colors.brandSoft,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: space.lg,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: colors.textHeading,
-    textAlign: "center",
-  },
-  subtitle: {
-    marginTop: space.sm,
-    fontSize: 15,
-    color: colors.textSecondary,
-    textAlign: "center",
-    lineHeight: 22,
-  },
-  hint: {
-    marginTop: space.xl,
-    fontSize: 14,
-    color: colors.textMuted,
-    textAlign: "center",
-    lineHeight: 20,
-  },
-  button: {
-    marginTop: space.xxl,
-    alignSelf: "stretch",
-  },
-});
+function createStyles({ colors, type }: ThemeTokens) {
+  return {
+    center: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    body: {
+      flex: 1,
+      paddingHorizontal: space.xl,
+      paddingTop: space.xxxl,
+      alignItems: "center",
+    },
+    iconWrap: {
+      width: 64,
+      height: 64,
+      borderRadius: radius.lg,
+      backgroundColor: colors.brandSoft,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: space.lg,
+    },
+    title: {
+      ...type.title,
+      textAlign: "center",
+    },
+    subtitle: {
+      ...type.callout,
+      marginTop: space.sm,
+      color: colors.textSecondary,
+      textAlign: "center",
+    },
+    hint: {
+      ...type.meta,
+      marginTop: space.xl,
+      color: colors.textMuted,
+      textAlign: "center",
+    },
+    button: {
+      marginTop: space.xxl,
+      alignSelf: "stretch",
+    },
+  };
+}

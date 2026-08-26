@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Image, StyleSheet, View } from "react-native";
 import BrandMark from "./BrandMark";
-import { colors, radius } from "../theme";
+import { radius, useAppTheme } from "../theme";
 
 type Props = {
   uri?: string | null;
@@ -9,6 +9,7 @@ type Props = {
 };
 
 export default function CompanyLogo({ uri, size = 56 }: Props) {
+  const { colors } = useAppTheme();
   const [failed, setFailed] = useState(false);
   const showImage = Boolean(uri) && !failed;
 
@@ -17,7 +18,18 @@ export default function CompanyLogo({ uri, size = 56 }: Props) {
   }, [uri]);
 
   return (
-    <View style={[styles.frame, { width: size, height: size, borderRadius: radius.md }]}>
+    <View
+      style={[
+        styles.frame,
+        {
+          width: size,
+          height: size,
+          borderRadius: radius.md,
+          backgroundColor: colors.surface,
+          borderColor: colors.border,
+        },
+      ]}
+    >
       {showImage ? (
         <Image
           source={{ uri: uri as string }}
@@ -35,9 +47,7 @@ export default function CompanyLogo({ uri, size = 56 }: Props) {
 
 const styles = StyleSheet.create({
   frame: {
-    backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",

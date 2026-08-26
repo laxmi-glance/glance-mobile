@@ -1,7 +1,7 @@
 import React from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { colors, radius, space } from "../theme";
+import { radius, space, useAppTheme, useThemedStyles, type ThemeTokens } from "../theme";
 
 type Props = {
   canApprove: boolean;
@@ -18,6 +18,8 @@ export default function ApprovalActions({
   onApprove,
   onReject,
 }: Props) {
+  const { colors } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
   const acting = Boolean(actingOn);
   if (!canApprove && !canReject) {
     return null;
@@ -116,6 +118,8 @@ function ChoiceButton({
   loading?: boolean;
   onPress: () => void;
 }) {
+  const { colors } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
   const approve = kind === "approve";
 
   return (
@@ -177,6 +181,8 @@ function ActionRow({
   loading?: boolean;
   onPress: () => void;
 }) {
+  const { colors } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
   const danger = tone === "danger";
 
   return (
@@ -216,156 +222,151 @@ function ActionRow({
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: space.lg,
-    marginBottom: space.md,
-  },
-  cardApproved: {
-    backgroundColor: colors.successSoft,
-    borderColor: "#BBF7D0",
-  },
-  cardRejected: {
-    backgroundColor: colors.dangerSoft,
-    borderColor: "#FECACA",
-  },
-  kicker: {
-    fontSize: 12,
-    fontWeight: "700",
-    letterSpacing: 0.5,
-    textTransform: "uppercase",
-    color: colors.warning,
-    marginBottom: 4,
-  },
-  lead: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    lineHeight: 20,
-  },
-  pair: {
-    flexDirection: "row",
-    gap: space.md,
-    marginTop: space.lg,
-  },
-  choice: {
-    flex: 1,
-    minHeight: 118,
-    borderRadius: radius.md,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: space.lg,
-    paddingHorizontal: space.sm,
-  },
-  choiceApprove: {
-    backgroundColor: colors.success,
-  },
-  choiceReject: {
-    backgroundColor: colors.white,
-    borderWidth: 1.5,
-    borderColor: colors.danger,
-  },
-  choiceIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 8,
-  },
-  choiceIconApprove: {
-    backgroundColor: "rgba(255,255,255,0.22)",
-  },
-  choiceIconReject: {
-    backgroundColor: colors.dangerSoft,
-  },
-  choiceLabel: {
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  choiceLabelLight: {
-    color: colors.white,
-  },
-  choiceLabelReject: {
-    color: colors.danger,
-  },
-  choiceHint: {
-    marginTop: 2,
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  choiceHintLight: {
-    color: "rgba(255,255,255,0.82)",
-  },
-  choiceHintReject: {
-    color: "#F87171",
-  },
-  statusRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: space.md,
-    marginBottom: space.md,
-  },
-  statusIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 1,
-  },
-  statusIconApproved: {
-    backgroundColor: "#DCFCE7",
-  },
-  statusIconRejected: {
-    backgroundColor: "#FEE2E2",
-  },
-  statusCopy: {
-    flex: 1,
-  },
-  statusTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: colors.textHeading,
-    marginBottom: 2,
-  },
-  actionRow: {
-    minHeight: 48,
-    borderRadius: radius.md,
-    paddingHorizontal: space.md,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: space.sm,
-  },
-  actionRowDanger: {
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: "#FECACA",
-  },
-  actionRowSuccess: {
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: "#BBF7D0",
-  },
-  actionRowLabel: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  actionRowLabelDanger: {
-    color: colors.danger,
-  },
-  actionRowLabelSuccess: {
-    color: colors.success,
-  },
-  pressed: {
-    opacity: 0.82,
-    transform: [{ scale: 0.98 }],
-  },
-  disabled: {
-    opacity: 0.6,
-  },
-});
+function createStyles({ colors, type }: ThemeTokens) {
+  return {
+    card: {
+      backgroundColor: colors.surface,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: space.lg,
+      marginBottom: space.md,
+    },
+    cardApproved: {
+      backgroundColor: colors.successSoft,
+      borderColor: "#BBF7D0",
+    },
+    cardRejected: {
+      backgroundColor: colors.dangerSoft,
+      borderColor: "#FECACA",
+    },
+    kicker: {
+      ...type.overline,
+      color: colors.warning,
+      textTransform: "uppercase",
+      marginBottom: 4,
+    },
+    lead: {
+      ...type.callout,
+      color: colors.textSecondary,
+    },
+    pair: {
+      flexDirection: "row",
+      gap: space.md,
+      marginTop: space.lg,
+    },
+    choice: {
+      flex: 1,
+      minHeight: 118,
+      borderRadius: radius.md,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: space.lg,
+      paddingHorizontal: space.sm,
+    },
+    choiceApprove: {
+      backgroundColor: colors.success,
+    },
+    choiceReject: {
+      backgroundColor: colors.white,
+      borderWidth: 1.5,
+      borderColor: colors.danger,
+    },
+    choiceIcon: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 8,
+    },
+    choiceIconApprove: {
+      backgroundColor: "rgba(255,255,255,0.22)",
+    },
+    choiceIconReject: {
+      backgroundColor: colors.dangerSoft,
+    },
+    choiceLabel: {
+      ...type.subtitle,
+    },
+    choiceLabelLight: {
+      color: colors.white,
+    },
+    choiceLabelReject: {
+      color: colors.danger,
+    },
+    choiceHint: {
+      ...type.caption,
+      marginTop: 2,
+    },
+    choiceHintLight: {
+      color: "rgba(255,255,255,0.82)",
+    },
+    choiceHintReject: {
+      color: colors.danger,
+    },
+    statusRow: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: space.md,
+      marginBottom: space.md,
+    },
+    statusIcon: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      alignItems: "center",
+      justifyContent: "center",
+      marginTop: 1,
+    },
+    statusIconApproved: {
+      backgroundColor: "#DCFCE7",
+    },
+    statusIconRejected: {
+      backgroundColor: "#FEE2E2",
+    },
+    statusCopy: {
+      flex: 1,
+    },
+    statusTitle: {
+      ...type.subtitle,
+      color: colors.textHeading,
+      marginBottom: 2,
+    },
+    actionRow: {
+      minHeight: 48,
+      borderRadius: radius.md,
+      paddingHorizontal: space.md,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: space.sm,
+    },
+    actionRowDanger: {
+      backgroundColor: colors.white,
+      borderWidth: 1,
+      borderColor: "#FECACA",
+    },
+    actionRowSuccess: {
+      backgroundColor: colors.white,
+      borderWidth: 1,
+      borderColor: "#BBF7D0",
+    },
+    actionRowLabel: {
+      ...type.cardTitle,
+      flex: 1,
+    },
+    actionRowLabelDanger: {
+      color: colors.danger,
+    },
+    actionRowLabelSuccess: {
+      color: colors.success,
+    },
+    pressed: {
+      opacity: 0.82,
+      transform: [{ scale: 0.98 }],
+    },
+    disabled: {
+      opacity: 0.6,
+    },
+  };
+}

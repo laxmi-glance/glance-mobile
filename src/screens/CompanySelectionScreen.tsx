@@ -19,7 +19,14 @@ import Screen from "../components/Screen";
 import PageHeader from "../components/PageHeader";
 import CompanyLogo from "../components/CompanyLogo";
 import EmptyState from "../components/EmptyState";
-import { colors, radius, space } from "../theme";
+import {
+  THEME_AUTO,
+  radius,
+  space,
+  useAppTheme,
+  useThemedStyles,
+  type ThemeTokens,
+} from "../theme";
 
 function formatRole(role?: string | null) {
   const value = (role || "").trim().replace(/_/g, " ");
@@ -30,6 +37,8 @@ function formatRole(role?: string | null) {
 }
 
 export default function CompanySelectionScreen({ navigation }: CompanySelectionScreenProps) {
+  const { colors, hydrateFromServer, setTheme } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
   const canGoBack = navigation.canGoBack();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -94,6 +103,7 @@ export default function CompanySelectionScreen({ navigation }: CompanySelectionS
     try {
       await authService.selectTenant(tenant.tenant_id);
       await tenantService.persistSelectedTenant({ ...tenant, is_current: true });
+      await hydrateFromServer();
       navigation.reset({ index: 0, routes: [{ name: "Main" }] });
     } catch (error: unknown) {
       Alert.alert("Could not open workspace", apiErrorMessage(error));
@@ -110,6 +120,7 @@ export default function CompanySelectionScreen({ navigation }: CompanySelectionS
         style: "destructive",
         onPress: async () => {
           await authService.logout();
+          await setTheme(THEME_AUTO, { syncBackend: false });
           navigation.replace("Login");
         },
       },
@@ -235,117 +246,111 @@ export default function CompanySelectionScreen({ navigation }: CompanySelectionS
   );
 }
 
-const styles = StyleSheet.create({
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  list: {
-    paddingHorizontal: space.lg,
-    paddingTop: space.md,
-    paddingBottom: space.xxxl,
-  },
-  section: {
-    marginBottom: space.sm,
-    marginLeft: 4,
-    fontSize: 12,
-    fontWeight: "700",
-    color: colors.textMuted,
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-  },
-  row: {
-    backgroundColor: colors.surface,
-    paddingVertical: 14,
-    paddingHorizontal: space.lg,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: space.md,
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderColor: colors.border,
-  },
-  rowCurrent: {
-    backgroundColor: colors.brandSoft,
-  },
-  rowDisabled: {
-    opacity: 0.55,
-  },
-  rowFirst: {
-    borderTopWidth: 1,
-    borderTopLeftRadius: radius.lg,
-    borderTopRightRadius: radius.lg,
-  },
-  rowLast: {
-    borderBottomWidth: 1,
-    borderBottomLeftRadius: radius.lg,
-    borderBottomRightRadius: radius.lg,
-  },
-  separator: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.border,
-    marginLeft: 40 + space.lg + space.md,
-  },
-  rowInfo: {
-    flex: 1,
-    minWidth: 0,
-  },
-  companyName: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: colors.textHeading,
-  },
-  metaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 6,
-  },
-  rolePill: {
-    alignSelf: "flex-start",
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  rolePillCurrent: {
-    backgroundColor: colors.white,
-  },
-  roleText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: colors.brand,
-  },
-  roleTextCurrent: {
-    color: colors.brand,
-  },
-  lifecycle: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: colors.textMuted,
-    textTransform: "capitalize",
-  },
-  notice: {
-    marginTop: 6,
-    fontSize: 12,
-    color: colors.danger,
-  },
-  check: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: colors.brand,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  signOut: {
-    alignItems: "center",
-    paddingVertical: space.xl,
-  },
-  signOutText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: colors.danger,
-  },
-});
+function createStyles({ colors, type }: ThemeTokens) {
+  return {
+    center: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    list: {
+      paddingHorizontal: space.lg,
+      paddingTop: space.md,
+      paddingBottom: space.xxxl,
+    },
+    section: {
+      ...type.overline,
+      marginBottom: space.sm,
+      marginLeft: 4,
+      textTransform: "uppercase",
+    },
+    row: {
+      backgroundColor: colors.surface,
+      paddingVertical: 14,
+      paddingHorizontal: space.lg,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: space.md,
+      borderLeftWidth: 1,
+      borderRightWidth: 1,
+      borderColor: colors.border,
+    },
+    rowCurrent: {
+      backgroundColor: colors.brandSoft,
+    },
+    rowDisabled: {
+      opacity: 0.55,
+    },
+    rowFirst: {
+      borderTopWidth: 1,
+      borderTopLeftRadius: radius.lg,
+      borderTopRightRadius: radius.lg,
+    },
+    rowLast: {
+      borderBottomWidth: 1,
+      borderBottomLeftRadius: radius.lg,
+      borderBottomRightRadius: radius.lg,
+    },
+    separator: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: colors.border,
+      marginLeft: 40 + space.lg + space.md,
+    },
+    rowInfo: {
+      flex: 1,
+      minWidth: 0,
+    },
+    companyName: {
+      ...type.subtitle,
+      color: colors.textHeading,
+    },
+    metaRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      marginTop: 6,
+    },
+    rolePill: {
+      alignSelf: "flex-start",
+      backgroundColor: colors.surfaceMuted,
+      borderRadius: 999,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+    },
+    rolePillCurrent: {
+      backgroundColor: colors.white,
+    },
+    roleText: {
+      ...type.overline,
+      color: colors.brand,
+    },
+    roleTextCurrent: {
+      color: colors.brand,
+    },
+    lifecycle: {
+      ...type.overline,
+      textTransform: "capitalize",
+    },
+    notice: {
+      ...type.caption,
+      marginTop: 6,
+      color: colors.danger,
+    },
+    check: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: colors.brand,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    signOut: {
+      alignItems: "center",
+      paddingVertical: space.xl,
+    },
+    signOutText: {
+      ...type.cardTitle,
+      color: colors.danger,
+    },
+  };
+}

@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ScannerScreenProps } from "../types/navigation";
 import { useDocumentUpload } from "../hooks/useDocumentUpload";
 import { pickDocuments, pickFromLibrary } from "../utils/pickUpload";
-import { colors } from "../theme";
+import { colors, type } from "../theme";
 
 const CORNER = {
   tl: "#EA4335",
@@ -454,14 +454,13 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   sheetTitle: {
+    ...type.subtitle,
     color: colors.white,
-    fontSize: 16,
-    fontWeight: "700",
   },
   sheetMeta: {
+    ...type.meta,
     marginTop: 6,
-    color: "rgba(255,255,255,0.7)",
-    fontSize: 13,
+    color: colors.textOnDarkMuted,
   },
   permission: {
     position: "absolute",
@@ -473,15 +472,14 @@ const styles = StyleSheet.create({
     zIndex: 3,
   },
   permissionTitle: {
+    ...type.subtitle,
     color: colors.white,
-    fontSize: 16,
-    fontWeight: "700",
     textAlign: "center",
   },
   permissionHint: {
+    ...type.meta,
     marginTop: 8,
-    color: "rgba(255,255,255,0.75)",
-    fontSize: 13,
+    color: colors.textOnDarkMuted,
     textAlign: "center",
     lineHeight: 18,
   },
@@ -495,7 +493,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   allowLabel: {
-    fontWeight: "700",
+    ...type.button,
     color: colors.textHeading,
   },
   busy: {
@@ -506,8 +504,8 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   busyLabel: {
+    ...type.subtitle,
     marginTop: 12,
     color: colors.white,
-    fontWeight: "600",
   },
 });

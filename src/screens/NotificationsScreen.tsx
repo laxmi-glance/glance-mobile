@@ -18,9 +18,11 @@ import Screen from "../components/Screen";
 import PageHeader from "../components/PageHeader";
 import EmptyState from "../components/EmptyState";
 import { mergeUniqueById } from "../utils/lists";
-import { colors, radius, space } from "../theme";
+import { radius, space, useAppTheme, useThemedStyles, type ThemeTokens } from "../theme";
 
 export default function NotificationsScreen({ navigation }: NotificationsScreenProps) {
+  const { colors } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
   const [items, setItems] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -134,61 +136,59 @@ export default function NotificationsScreen({ navigation }: NotificationsScreenP
   );
 }
 
-const styles = StyleSheet.create({
-  list: {
-    paddingHorizontal: space.lg,
-    paddingBottom: space.xxxl,
-  },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: space.lg,
-    marginBottom: space.md,
-    flexDirection: "row",
-    gap: space.md,
-  },
-  unread: {
-    borderColor: colors.brandSoft,
-    backgroundColor: colors.surfaceMuted,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.brand,
-    marginTop: 6,
-  },
-  dotSpacer: {
-    width: 8,
-  },
-  body: {
-    flex: 1,
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: colors.text,
-  },
-  message: {
-    marginTop: 6,
-    fontSize: 14,
-    color: colors.textSecondary,
-    lineHeight: 20,
-  },
-  meta: {
-    marginTop: 8,
-    fontSize: 12,
-    color: colors.textMuted,
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: colors.overlay,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  footer: {
-    marginVertical: space.lg,
-  },
-});
+function createStyles({ colors, type }: ThemeTokens) {
+  return {
+    list: {
+      paddingHorizontal: space.lg,
+      paddingBottom: space.xxxl,
+    },
+    card: {
+      backgroundColor: colors.surface,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: space.lg,
+      marginBottom: space.md,
+      flexDirection: "row",
+      gap: space.md,
+    },
+    unread: {
+      borderColor: colors.brandSoft,
+      backgroundColor: colors.surfaceMuted,
+    },
+    dot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: colors.brand,
+      marginTop: 6,
+    },
+    dotSpacer: {
+      width: 8,
+    },
+    body: {
+      flex: 1,
+    },
+    title: {
+      ...type.subtitle,
+    },
+    message: {
+      ...type.callout,
+      marginTop: 6,
+      color: colors.textSecondary,
+    },
+    meta: {
+      ...type.caption,
+      marginTop: 8,
+    },
+    overlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: colors.overlay,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    footer: {
+      marginVertical: space.lg,
+    },
+  };
+}

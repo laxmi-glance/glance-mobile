@@ -5,7 +5,7 @@ import { StatusBar } from "expo-status-bar";
 import { LoginScreenProps } from "../types/navigation";
 import BrandMark from "../components/BrandMark";
 import Button from "../components/Button";
-import { colors, space } from "../theme";
+import { colors, space, type } from "../theme";
 
 export default function LoginScreen({ navigation }: LoginScreenProps) {
   const [opening, setOpening] = useState(false);
@@ -63,16 +63,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.xxxl,
   },
   logo: {
+    ...type.display,
     marginTop: space.lg,
     fontSize: 32,
-    fontWeight: "700",
+    lineHeight: 38,
     color: colors.white,
-    letterSpacing: -0.6,
   },
   tagline: {
+    ...type.body,
     marginTop: space.sm,
-    fontSize: 16,
-    color: "rgba(255,255,255,0.72)",
+    color: colors.textOnDarkMuted,
     textAlign: "center",
   },
   sheet: {
@@ -84,29 +84,27 @@ const styles = StyleSheet.create({
     paddingBottom: space.lg,
   },
   title: {
+    ...type.title,
     fontSize: 24,
-    fontWeight: "700",
-    color: colors.textHeading,
+    lineHeight: 30,
   },
   lead: {
+    ...type.callout,
     marginTop: space.sm,
     marginBottom: space.xl,
-    fontSize: 15,
-    lineHeight: 22,
     color: colors.textSecondary,
   },
   cta: {
     marginBottom: space.lg,
   },
   footer: {
+    ...type.meta,
     textAlign: "center",
-    fontSize: 13,
-    color: colors.textSecondary,
-    lineHeight: 20,
     marginBottom: space.md,
   },
   link: {
-    color: colors.interactive,
-    fontWeight: "600",
+    ...type.link,
+    fontSize: 13,
+    lineHeight: 18,
   },
 });

@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { WebView } from "react-native-webview";
 import * as FileSystem from "expo-file-system/legacy";
-import { colors, radius } from "../theme";
+import { radius, useAppTheme, useThemedStyles, type ThemeTokens } from "../theme";
 
 type Props = {
   url: string;
@@ -70,6 +70,8 @@ function pdfHtml(base64: string): string {
 }
 
 export default function DocumentPreview({ url, fileName }: Props) {
+  const { colors } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
   const pdf = useMemo(() => isPdfSource(url, fileName), [url, fileName]);
   const image = useMemo(() => isImageSource(url, fileName), [url, fileName]);
   const [pdfHtmlSource, setPdfHtmlSource] = useState<string | null>(null);
@@ -212,41 +214,42 @@ export default function DocumentPreview({ url, fileName }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  frame: {
-    height: 460,
-    backgroundColor: colors.surfaceMuted,
-    overflow: "hidden",
-    borderRadius: radius.md,
-  },
-  imageScroll: {
-    minHeight: 460,
-    justifyContent: "center",
-  },
-  image: {
-    width: "100%",
-    height: 460,
-  },
-  loading: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.surfaceMuted,
-    gap: 8,
-  },
-  loadingText: {
-    fontSize: 13,
-    color: colors.textSecondary,
-  },
-  fallback: {
-    height: 120,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 16,
-  },
-  fallbackText: {
-    fontSize: 14,
-    color: colors.danger,
-    textAlign: "center",
-  },
-});
+function createStyles({ colors, type }: ThemeTokens) {
+  return {
+    frame: {
+      height: 460,
+      backgroundColor: colors.surfaceMuted,
+      overflow: "hidden",
+      borderRadius: radius.md,
+    },
+    imageScroll: {
+      minHeight: 460,
+      justifyContent: "center",
+    },
+    image: {
+      width: "100%",
+      height: 460,
+    },
+    loading: {
+      ...StyleSheet.absoluteFillObject,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: colors.surfaceMuted,
+      gap: 8,
+    },
+    loadingText: {
+      ...type.meta,
+    },
+    fallback: {
+      height: 120,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 16,
+    },
+    fallbackText: {
+      ...type.callout,
+      color: colors.danger,
+      textAlign: "center",
+    },
+  };
+}

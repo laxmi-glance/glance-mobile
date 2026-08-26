@@ -1,4 +1,4 @@
-import { colors } from "../theme/colors";
+import { lightColors, type AppColors } from "../theme/colors";
 import type { PreprocessingDocument } from "../types/models";
 
 export type StatusTone = "success" | "processing" | "failed" | "queued" | "neutral";
@@ -20,18 +20,18 @@ export function statusTone(doc: PreprocessingDocument): StatusTone {
   return "neutral";
 }
 
-export function statusColor(tone: StatusTone): string {
+export function statusColor(tone: StatusTone, palette: AppColors = lightColors): string {
   switch (tone) {
     case "success":
-      return colors.success;
+      return palette.success;
     case "processing":
-      return colors.processing;
+      return palette.processing;
     case "failed":
-      return colors.danger;
+      return palette.danger;
     case "queued":
-      return colors.queued;
+      return palette.queued;
     default:
-      return colors.textMuted;
+      return palette.textMuted;
   }
 }
 

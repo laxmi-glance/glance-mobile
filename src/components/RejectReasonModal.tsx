@@ -1,15 +1,7 @@
 import React, { useState } from "react";
-import {
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { KeyboardAvoidingView, Modal, Platform, Text, TextInput, View } from "react-native";
 import Button from "./Button";
-import { colors, radius, space } from "../theme";
+import { radius, space, useAppTheme, useThemedStyles, type ThemeTokens } from "../theme";
 
 type Props = {
   visible: boolean;
@@ -28,6 +20,8 @@ export default function RejectReasonModal({
   title = "Reject document",
   lead = "A reason is required so the submitter knows what to fix.",
 }: Props) {
+  const { colors } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
   const [remarks, setRemarks] = useState("");
 
   const handleClose = () => {
@@ -47,7 +41,7 @@ export default function RejectReasonModal({
           <TextInput
             style={styles.input}
             placeholder="Rejection reason"
-            placeholderTextColor={colors.textMuted}
+            placeholderTextColor={colors.textPlaceholder}
             value={remarks}
             onChangeText={setRemarks}
             multiline
@@ -70,46 +64,45 @@ export default function RejectReasonModal({
   );
 }
 
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(15, 0, 51, 0.45)",
-    justifyContent: "flex-end",
-  },
-  sheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    padding: space.xxl,
-    paddingBottom: 36,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: colors.textHeading,
-  },
-  lead: {
-    marginTop: 6,
-    marginBottom: space.lg,
-    fontSize: 14,
-    color: colors.textSecondary,
-    lineHeight: 20,
-  },
-  input: {
-    minHeight: 96,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    borderRadius: radius.md,
-    padding: space.md,
-    fontSize: 15,
-    color: colors.text,
-    marginBottom: space.lg,
-  },
-  actions: {
-    flexDirection: "row",
-    gap: space.md,
-  },
-  btn: {
-    flex: 1,
-  },
-});
+function createStyles({ colors, type }: ThemeTokens) {
+  return {
+    overlay: {
+      flex: 1,
+      backgroundColor: "rgba(15, 0, 51, 0.45)",
+      justifyContent: "flex-end",
+    },
+    sheet: {
+      backgroundColor: colors.surface,
+      borderTopLeftRadius: radius.xl,
+      borderTopRightRadius: radius.xl,
+      padding: space.xxl,
+      paddingBottom: 36,
+    },
+    title: {
+      ...type.title,
+    },
+    lead: {
+      ...type.callout,
+      marginTop: 6,
+      marginBottom: space.lg,
+      color: colors.textSecondary,
+    },
+    input: {
+      ...type.input,
+      minHeight: 96,
+      borderWidth: 1,
+      borderColor: colors.borderStrong,
+      borderRadius: radius.md,
+      padding: space.md,
+      marginBottom: space.lg,
+      textAlignVertical: "top",
+    },
+    actions: {
+      flexDirection: "row",
+      gap: space.md,
+    },
+    btn: {
+      flex: 1,
+    },
+  };
+}

@@ -7,11 +7,13 @@ import { WEB_LOGIN_URL } from "../config/env";
 import { READ_CAPTURED_LOGIN_JS, WEB_LOGIN_CAPTURE_HOOK } from "../auth/webLoginHook";
 import authService from "../services/auth.service";
 import type { LoginResponse } from "../types/models";
-import { colors } from "../theme";
+import { useAppTheme, useThemedStyles, type ThemeTokens } from "../theme";
 
 const AUTH_TIMEOUT_MS = 10 * 60 * 1000;
 
 export default function WebAuthLoginScreen({ navigation }: WebAuthLoginScreenProps) {
+  const { colors } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
   const webRef = useRef<WebView>(null);
   const settled = useRef(false);
   const [pageError, setPageError] = useState("");
@@ -111,8 +113,10 @@ export default function WebAuthLoginScreen({ navigation }: WebAuthLoginScreenPro
           <Text style={styles.errorUrl}>{WEB_LOGIN_URL}</Text>
           <Text style={styles.errorBody}>{pageError}</Text>
           <Text style={styles.errorHint}>
-            On an emulator this usually means DNS or internet is off. Open Chrome in the emulator
-            and load the URL above, then retry.
+            A phone cannot reach localhost on your computer. Use the same Wi-Fi as this machine,
+            keep the web app running, and retry. The sign-in URL should be your LAN IP (shown as
+            {' "On Your Network" '}
+            in glance-frontend), not localhost.
           </Text>
         </View>
       ) : null}
@@ -120,73 +124,69 @@ export default function WebAuthLoginScreen({ navigation }: WebAuthLoginScreenPro
   );
 }
 
-const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: colors.surface,
-  },
-  header: {
-    height: 48,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  close: {
-    color: colors.interactive,
-    fontSize: 16,
-    fontWeight: "600",
-    width: 64,
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: colors.textHeading,
-  },
-  headerSpacer: {
-    width: 64,
-  },
-  loading: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: colors.surface,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  loadingText: {
-    marginTop: 12,
-    color: colors.textSecondary,
-    fontSize: 14,
-  },
-  errorBanner: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    backgroundColor: colors.dangerSoft,
-  },
-  errorTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: colors.danger,
-  },
-  errorUrl: {
-    marginTop: 6,
-    fontSize: 13,
-    fontWeight: "600",
-    color: colors.textHeading,
-  },
-  errorBody: {
-    marginTop: 6,
-    fontSize: 13,
-    color: colors.text,
-    lineHeight: 18,
-  },
-  errorHint: {
-    marginTop: 8,
-    fontSize: 12,
-    color: colors.textSecondary,
-    lineHeight: 17,
-  },
-});
+function createStyles({ colors, type }: ThemeTokens) {
+  return {
+    safe: {
+      flex: 1,
+      backgroundColor: colors.surface,
+    },
+    header: {
+      height: 48,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    close: {
+      ...type.subtitle,
+      color: colors.interactive,
+      width: 64,
+    },
+    headerTitle: {
+      ...type.subtitle,
+      color: colors.textHeading,
+    },
+    headerSpacer: {
+      width: 64,
+    },
+    loading: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: colors.surface,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    loadingText: {
+      ...type.callout,
+      marginTop: 12,
+      color: colors.textSecondary,
+    },
+    errorBanner: {
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      backgroundColor: colors.dangerSoft,
+    },
+    errorTitle: {
+      ...type.cardTitle,
+      color: colors.danger,
+    },
+    errorUrl: {
+      ...type.label,
+      marginTop: 6,
+      color: colors.textHeading,
+    },
+    errorBody: {
+      ...type.meta,
+      marginTop: 6,
+      color: colors.text,
+    },
+    errorHint: {
+      ...type.caption,
+      marginTop: 8,
+      color: colors.textSecondary,
+    },
+  };
+}

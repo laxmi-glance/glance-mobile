@@ -1,14 +1,13 @@
 import React from "react";
 import {
   ActivityIndicator,
-  StyleSheet,
   Text,
   TouchableOpacity,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { colors, radius } from "../theme";
+import { radius, useAppTheme, useThemedStyles, type ThemeTokens } from "../theme";
 import type { IconName } from "../config/features";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger";
@@ -32,6 +31,8 @@ export default function Button({
   icon,
   style,
 }: Props) {
+  const { colors } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
   const busy = Boolean(loading || disabled);
   const lightLabel = variant === "primary" || variant === "danger";
 
@@ -63,43 +64,44 @@ export default function Button({
   );
 }
 
-const styles = StyleSheet.create({
-  base: {
-    minHeight: 48,
-    borderRadius: radius.md,
-    paddingHorizontal: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  primary: {
-    backgroundColor: colors.brand,
-  },
-  secondary: {
-    backgroundColor: colors.brandSoft,
-  },
-  ghost: {
-    backgroundColor: "transparent",
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-  },
-  danger: {
-    backgroundColor: colors.danger,
-  },
-  disabled: {
-    opacity: 0.6,
-  },
-  icon: {
-    marginRight: 8,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  labelLight: {
-    color: colors.white,
-  },
-  labelDark: {
-    color: colors.brand,
-  },
-});
+function createStyles({ colors, type }: ThemeTokens) {
+  return {
+    base: {
+      minHeight: 48,
+      borderRadius: radius.md,
+      paddingHorizontal: 16,
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+    },
+    primary: {
+      backgroundColor: colors.brand,
+    },
+    secondary: {
+      backgroundColor: colors.brandSoft,
+    },
+    ghost: {
+      backgroundColor: "transparent",
+      borderWidth: 1,
+      borderColor: colors.borderStrong,
+    },
+    danger: {
+      backgroundColor: colors.danger,
+    },
+    disabled: {
+      opacity: 0.6,
+    },
+    icon: {
+      marginRight: 8,
+    },
+    label: {
+      ...type.button,
+    },
+    labelLight: {
+      color: colors.white,
+    },
+    labelDark: {
+      color: colors.brand,
+    },
+  };
+}

@@ -1,5 +1,5 @@
 import React from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 import { ReportsScreenProps } from "../types/navigation";
 import { REPORT_GROUPS } from "../config/reports";
 import { useRbac } from "../hooks/useRbac";
@@ -7,9 +7,11 @@ import Screen from "../components/Screen";
 import PageHeader from "../components/PageHeader";
 import ListRow from "../components/ListRow";
 import EmptyState from "../components/EmptyState";
-import { colors, space } from "../theme";
+import { space, useAppTheme, useThemedStyles, type ThemeTokens } from "../theme";
 
 export default function ReportsListScreen({ navigation }: ReportsScreenProps) {
+  const { colors } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
   const { allows, loading, reload } = useRbac();
   const canView = allows("reports", "view");
 
@@ -54,26 +56,25 @@ export default function ReportsListScreen({ navigation }: ReportsScreenProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  content: {
-    paddingHorizontal: space.lg,
-    paddingBottom: 40,
-  },
-  group: {
-    marginBottom: space.lg,
-  },
-  section: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: colors.textMuted,
-    textTransform: "uppercase",
-    letterSpacing: 0.4,
-    marginBottom: space.sm,
-    marginTop: space.sm,
-  },
-});
+function createStyles({ colors, type }: ThemeTokens) {
+  return {
+    center: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    content: {
+      paddingHorizontal: space.lg,
+      paddingBottom: 40,
+    },
+    group: {
+      marginBottom: space.lg,
+    },
+    section: {
+      ...type.overline,
+      textTransform: "uppercase",
+      marginBottom: space.sm,
+      marginTop: space.sm,
+    },
+  };
+}

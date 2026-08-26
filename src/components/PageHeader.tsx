@@ -14,7 +14,7 @@ import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import BrandMark from "./BrandMark";
 import type { IconName } from "../config/features";
-import { colors } from "../theme";
+import { useAppTheme, useThemedStyles, type ThemeTokens } from "../theme";
 
 export type PageHeaderMenuAction = {
   key: string;
@@ -53,6 +53,8 @@ export default function PageHeader({
   onSupportingPress,
   menuActions = [],
 }: Props) {
+  const { colors } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
   const insets = useSafeAreaInsets();
   const menuBtnRef = useRef<View>(null);
   const [logoFailed, setLogoFailed] = useState(false);
@@ -182,100 +184,103 @@ export default function PageHeader({
   );
 }
 
-const styles = StyleSheet.create({
-  bar: {
-    backgroundColor: "#1C1C1E",
-    paddingBottom: 12,
-    paddingHorizontal: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    zIndex: 20,
-  },
-  sideBtn: {
-    width: 36,
-    height: 36,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  pageIcon: {
-    width: ICON_SIZE,
-    height: ICON_SIZE,
-    borderRadius: ICON_SIZE / 2,
-    backgroundColor: ICON_BG,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-  },
-  logo: {
-    width: ICON_SIZE - 8,
-    height: ICON_SIZE - 8,
-  },
-  titles: {
-    flex: 1,
-    minWidth: 0,
-    marginLeft: 2,
-  },
-  title: {
-    color: colors.white,
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  subtitle: {
-    marginTop: 1,
-    color: "rgba(255,255,255,0.7)",
-    fontSize: 12,
-  },
-  badge: {
-    position: "absolute",
-    top: 2,
-    right: 2,
-    minWidth: 15,
-    height: 15,
-    paddingHorizontal: 3,
-    borderRadius: 8,
-    backgroundColor: colors.danger,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  badgeText: {
-    color: colors.white,
-    fontSize: 8,
-    fontWeight: "700",
-  },
-  menuRoot: {
-    flex: 1,
-  },
-  menu: {
-    position: "absolute",
-    right: 10,
-    minWidth: 196,
-    backgroundColor: "#2C2C2E",
-    borderRadius: 8,
-    paddingVertical: 8,
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOpacity: 0.35,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: 6 },
-      },
-      android: { elevation: 8 },
-      default: {},
-    }),
-  },
-  menuItem: {
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-  },
-  menuItemPressed: {
-    backgroundColor: "rgba(255,255,255,0.08)",
-  },
-  menuLabel: {
-    color: colors.white,
-    fontSize: 16,
-  },
-  menuLabelDanger: {
-    color: colors.danger,
-  },
-});
+function createStyles({ colors, type }: ThemeTokens) {
+  return {
+    bar: {
+      backgroundColor: "#1C1C1E",
+      paddingBottom: 12,
+      paddingHorizontal: 10,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      zIndex: 20,
+    },
+    sideBtn: {
+      width: 36,
+      height: 36,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    pageIcon: {
+      width: ICON_SIZE,
+      height: ICON_SIZE,
+      borderRadius: ICON_SIZE / 2,
+      backgroundColor: ICON_BG,
+      alignItems: "center",
+      justifyContent: "center",
+      overflow: "hidden",
+    },
+    logo: {
+      width: ICON_SIZE - 8,
+      height: ICON_SIZE - 8,
+    },
+    titles: {
+      flex: 1,
+      minWidth: 0,
+      marginLeft: 2,
+    },
+    title: {
+      ...type.subtitle,
+      color: colors.white,
+    },
+    subtitle: {
+      ...type.caption,
+      marginTop: 1,
+      color: colors.textOnDarkMuted,
+    },
+    badge: {
+      position: "absolute",
+      top: 2,
+      right: 2,
+      minWidth: 15,
+      height: 15,
+      paddingHorizontal: 3,
+      borderRadius: 8,
+      backgroundColor: colors.danger,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    badgeText: {
+      ...type.overline,
+      color: colors.white,
+      fontSize: 9,
+      lineHeight: 11,
+      letterSpacing: 0,
+    },
+    menuRoot: {
+      flex: 1,
+    },
+    menu: {
+      position: "absolute",
+      right: 10,
+      minWidth: 196,
+      backgroundColor: "#2C2C2E",
+      borderRadius: 8,
+      paddingVertical: 8,
+      ...Platform.select({
+        ios: {
+          shadowColor: "#000",
+          shadowOpacity: 0.35,
+          shadowRadius: 12,
+          shadowOffset: { width: 0, height: 6 },
+        },
+        android: { elevation: 8 },
+        default: {},
+      }),
+    },
+    menuItem: {
+      paddingVertical: 14,
+      paddingHorizontal: 20,
+    },
+    menuItemPressed: {
+      backgroundColor: "rgba(255,255,255,0.08)",
+    },
+    menuLabel: {
+      ...type.subtitle,
+      color: colors.white,
+    },
+    menuLabelDanger: {
+      color: colors.danger,
+    },
+  };
+}
