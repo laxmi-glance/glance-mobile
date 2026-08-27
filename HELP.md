@@ -120,11 +120,26 @@ npx eas-cli build --platform ios --profile preview
 
 Without an Apple Developer ID, use Expo Go + `--tunnel` (see above). TestFlight also requires Apple Developer + `eas submit`.
 
+### Android production APK (sideload, production API)
+
+Same install flow as staging, but talks to `https://api.glancewise.app`.
+
+```bash
+pnpm build:android:production-apk
+```
+
 ### Production store binaries
 
 ```bash
-npx eas-cli build --platform android --profile production   # Play Store AAB
-npx eas-cli build --platform ios --profile production       # App Store / TestFlight
+pnpm build:android:production   # Play Store AAB
+pnpm build:ios:production       # App Store / TestFlight (Apple Developer required)
+```
+
+Equivalent:
+
+```bash
+npx eas-cli build --platform android --profile production
+npx eas-cli build --platform ios --profile production
 ```
 
 ### Useful EAS commands
