@@ -37,6 +37,43 @@ export function approvalTone(status?: ApprovalStatus | null): StatusTone {
   }
 }
 
+function postingStatus(item: FinancialDocumentListItem): string {
+  return String(item.gl_posting_status || "").toUpperCase();
+}
+
+export function documentLifecycleLabel(item: FinancialDocumentListItem): string {
+  if (isProcessingRow(item)) {
+    return item.status || "Processing";
+  }
+  const posting = postingStatus(item);
+  if (posting === "POSTED") {
+    return "Posted";
+  }
+  if (posting === "VOIDED") {
+    return "Voided";
+  }
+  return approvalLabel(item.approval_status);
+}
+
+export function documentLifecycleTone(item: FinancialDocumentListItem): StatusTone {
+  if (isProcessingRow(item)) {
+    return "processing";
+  }
+  const posting = postingStatus(item);
+  if (posting === "POSTED") {
+    return "success";
+  }
+  if (posting === "VOIDED") {
+    return "failed";
+  }
+  return approvalTone(item.approval_status);
+}
+
+export function uploaderName(item: FinancialDocumentListItem): string | null {
+  const name = (item.created_by || item.created_by_username || "").trim();
+  return name || null;
+}
+
 export function displayName(
   user?: { first_name?: string; last_name?: string; username?: string } | null
 ): string {
