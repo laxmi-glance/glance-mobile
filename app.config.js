@@ -12,6 +12,7 @@ module.exports = ({ config }) => {
     ...config,
     android: {
       ...config.android,
+      allowBackup: false,
       usesCleartextTraffic: allowLocalHttp,
     },
     ios: {

@@ -1,7 +1,13 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_BASE_URL, API_TIMEOUT_MS } from "./env";
-import { StorageKeys, clearSession } from "../core/storage";
+import {
+  StorageKeys,
+  clearSession,
+  getAccessToken,
+  getRefreshToken,
+  setTokenPair,
+} from "../core/storage";
 import { notifySessionExpired } from "../core/sessionEvents";
 import type { TokenPair } from "../types/models";
 
@@ -33,7 +39,7 @@ function isPublicPath(url?: string): boolean {
 
 apiClient.interceptors.request.use(async (config) => {
   const publicPath = isPublicPath(config.url);
-  const token = await AsyncStorage.getItem(StorageKeys.accessToken);
+  const token = await getAccessToken();
   if (token && !publicPath) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -54,7 +60,7 @@ apiClient.interceptors.request.use(async (config) => {
 let refreshInFlight: Promise<string | null> | null = null;
 
 async function rotateTokens(): Promise<string | null> {
-  const refresh = await AsyncStorage.getItem(StorageKeys.refreshToken);
+  const refresh = await getRefreshToken();
   if (!refresh) {
     return null;
   }
@@ -65,10 +71,7 @@ async function rotateTokens(): Promise<string | null> {
     { timeout: API_TIMEOUT_MS, headers: { "Content-Type": "application/json" } }
   );
 
-  await AsyncStorage.setItem(StorageKeys.accessToken, data.access);
-  if (data.refresh) {
-    await AsyncStorage.setItem(StorageKeys.refreshToken, data.refresh);
-  }
+  await setTokenPair(data.access, data.refresh);
   return data.access;
 }
 

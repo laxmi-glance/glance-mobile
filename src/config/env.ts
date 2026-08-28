@@ -14,7 +14,7 @@ const API_HOSTS: Record<ApiEnv, string> = {
 const FRONTEND_HOSTS: Record<ApiEnv, string> = {
   local: "http://localhost:3000",
   staging: "https://staging.glancewise.app",
-  production: "https://app.glancewise.app",
+  production: "https://glancewise.app",
 };
 
 type ExtraConfig = {

@@ -1,7 +1,6 @@
 /**
- * Same fetch/XHR hook as glance-connector/src/webAuthLogin.js.
- * Tags login with client_type=connector (backend recaptcha bypass used by the desktop agent)
- * and posts the /users/login/ JSON back to React Native.
+ * Captures /users/login/ JSON from the Glance web login page and posts it
+ * back to React Native. Does not alter the request body or recaptcha fields.
  */
 export const WEB_LOGIN_CAPTURE_HOOK = `
 (() => {
@@ -9,11 +8,19 @@ export const WEB_LOGIN_CAPTURE_HOOK = `
     return;
   }
   window.__glanceMobileHookInstalled = true;
-  window.__glanceConnectorLoginPayload = null;
+  window.__glanceMobileLoginPayload = null;
 
-  const CONNECTOR_CLIENT_VALUE = 'connector';
-
-  const isLoginUrl = (url) => Boolean(url && String(url).includes('/users/login'));
+  const isLoginUrl = (url) => {
+    if (!url) {
+      return false;
+    }
+    try {
+      const parsed = new URL(String(url), window.location.href);
+      return parsed.pathname.indexOf('/users/login') !== -1;
+    } catch (_err) {
+      return String(url).indexOf('/users/login') !== -1;
+    }
+  };
 
   const postToApp = (data) => {
     try {
@@ -23,20 +30,6 @@ export const WEB_LOGIN_CAPTURE_HOOK = `
     } catch (_err) {}
   };
 
-  const tagConnectorLoginBody = (body) => {
-    if (typeof body !== 'string' || !body.trim()) {
-      return body;
-    }
-    try {
-      const parsed = JSON.parse(body);
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        parsed.client_type = CONNECTOR_CLIENT_VALUE;
-        return JSON.stringify(parsed);
-      }
-    } catch (_err) {}
-    return body;
-  };
-
   const captureLoginResponse = (url, bodyText) => {
     if (!isLoginUrl(url)) {
       return;
@@ -44,7 +37,7 @@ export const WEB_LOGIN_CAPTURE_HOOK = `
     try {
       const data = JSON.parse(bodyText);
       if (data && data.access) {
-        window.__glanceConnectorLoginPayload = data;
+        window.__glanceMobileLoginPayload = data;
         postToApp(data);
       }
     } catch (_err) {}
@@ -52,19 +45,7 @@ export const WEB_LOGIN_CAPTURE_HOOK = `
 
   const originalFetch = window.fetch;
   window.fetch = async function glanceMobileFetch(input, init) {
-    let nextInit = init;
-    try {
-      const url = typeof input === 'string' ? input : input && input.url ? input.url : '';
-      if (isLoginUrl(url)) {
-        let body = init && init.body;
-        if (typeof body === 'string') {
-          body = tagConnectorLoginBody(body);
-          nextInit = Object.assign({}, init || {}, { body: body });
-        }
-      }
-    } catch (_err) {}
-
-    const response = await originalFetch.call(this, input, nextInit);
+    const response = await originalFetch.call(this, input, init);
     try {
       const url = typeof input === 'string' ? input : input && input.url ? input.url : '';
       if (isLoginUrl(url)) {
@@ -79,23 +60,17 @@ export const WEB_LOGIN_CAPTURE_HOOK = `
   const originalOpen = xhrProto.open;
   const originalSend = xhrProto.send;
   xhrProto.open = function glanceMobileXhrOpen(method, url) {
-    this.__glanceConnectorUrl = url;
+    this.__glanceMobileLoginUrl = url;
     return originalOpen.apply(this, arguments);
   };
   xhrProto.send = function glanceMobileXhrSend(body) {
-    let nextBody = body;
-    const loginRequest = isLoginUrl(this.__glanceConnectorUrl);
-    try {
-      if (loginRequest && typeof nextBody === 'string') {
-        nextBody = tagConnectorLoginBody(nextBody);
-      }
-    } catch (_err) {}
+    const loginRequest = isLoginUrl(this.__glanceMobileLoginUrl);
     if (loginRequest) {
       this.addEventListener('load', function onLoginLoad() {
-        captureLoginResponse(this.__glanceConnectorUrl, this.responseText);
+        captureLoginResponse(this.__glanceMobileLoginUrl, this.responseText);
       }, { once: true });
     }
-    return originalSend.call(this, nextBody);
+    return originalSend.call(this, body);
   };
 })();
 true;
@@ -104,7 +79,7 @@ true;
 export const READ_CAPTURED_LOGIN_JS = `
 (function () {
   try {
-    var payload = window.__glanceConnectorLoginPayload || null;
+    var payload = window.__glanceMobileLoginPayload || null;
     if (payload && payload.access && window.ReactNativeWebView) {
       window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'login', data: payload }));
     }

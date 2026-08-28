@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { WebView } from "react-native-webview";
 import * as FileSystem from "expo-file-system/legacy";
+import { PAYABLE_PREVIEW_CACHE_NAME } from "../core/storage";
 import { radius, useAppTheme, useThemedStyles, type ThemeTokens } from "../theme";
 
 type Props = {
@@ -93,7 +94,7 @@ export default function DocumentPreview({ url, fileName }: Props) {
       setLoading(true);
       setError("");
       try {
-        const dest = `${FileSystem.cacheDirectory}payable-preview.pdf`;
+        const dest = `${FileSystem.cacheDirectory}${PAYABLE_PREVIEW_CACHE_NAME}`;
         const download = await FileSystem.downloadAsync(url, dest);
         const base64 = await FileSystem.readAsStringAsync(download.uri, {
           encoding: FileSystem.EncodingType.Base64,

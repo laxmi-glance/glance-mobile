@@ -27,6 +27,7 @@
         "backgroundColor": "#13003E"
       },
       "package": "com.glancewise.mobile",
+      "allowBackup": false,
       "permissions": [
         "android.permission.INTERNET",
         "android.permission.ACCESS_NETWORK_STATE",
@@ -54,7 +55,8 @@
         }
       ],
       "expo-document-picker",
-      "expo-font"
+      "expo-font",
+      "expo-secure-store"
     ],
     "extra": {
       "apiBaseUrl": "",

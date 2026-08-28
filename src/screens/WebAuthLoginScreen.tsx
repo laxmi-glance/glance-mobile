@@ -5,6 +5,15 @@ import { WebView, type WebViewMessageEvent, type WebViewNavigation } from "react
 import { WebAuthLoginScreenProps } from "../types/navigation";
 import { WEB_LOGIN_URL } from "../config/env";
 import { READ_CAPTURED_LOGIN_JS, WEB_LOGIN_CAPTURE_HOOK } from "../auth/webLoginHook";
+import {
+  isAuthFlowPath,
+  isHttpsLoginConfigured,
+  isTrustedAuthUrl,
+  loginMixedContentMode,
+  loginOriginWhitelist,
+  shouldAllowAuthNavigation,
+  shouldReadCapturedLogin,
+} from "../auth/webAuthOrigins";
 import authService from "../services/auth.service";
 import type { LoginResponse } from "../types/models";
 import { useAppTheme, useThemedStyles, type ThemeTokens } from "../theme";
@@ -16,9 +25,20 @@ export default function WebAuthLoginScreen({ navigation }: WebAuthLoginScreenPro
   const styles = useThemedStyles(createStyles);
   const webRef = useRef<WebView>(null);
   const settled = useRef(false);
+  const lastTrustedUrl = useRef(WEB_LOGIN_URL);
   const [pageError, setPageError] = useState("");
+  const httpsOk = isHttpsLoginConfigured();
 
   useEffect(() => {
+    if (!httpsOk) {
+      setPageError("Sign-in must use HTTPS in this environment.");
+    }
+  }, [httpsOk]);
+
+  useEffect(() => {
+    if (!httpsOk) {
+      return;
+    }
     const timer = setTimeout(() => {
       if (!settled.current) {
         Alert.alert("Sign in timed out", "Please try again.");
@@ -26,7 +46,7 @@ export default function WebAuthLoginScreen({ navigation }: WebAuthLoginScreenPro
       }
     }, AUTH_TIMEOUT_MS);
     return () => clearTimeout(timer);
-  }, [navigation]);
+  }, [httpsOk, navigation]);
 
   const finishSuccess = async (data: LoginResponse) => {
     if (settled.current || !data?.access) {
@@ -51,6 +71,15 @@ export default function WebAuthLoginScreen({ navigation }: WebAuthLoginScreenPro
   };
 
   const handleMessage = (event: WebViewMessageEvent) => {
+    const messageUrl = event.nativeEvent.url?.trim();
+    const trustedPage =
+      isTrustedAuthUrl(messageUrl) ||
+      (!messageUrl &&
+        isTrustedAuthUrl(lastTrustedUrl.current) &&
+        isAuthFlowPath(lastTrustedUrl.current));
+    if (!trustedPage) {
+      return;
+    }
     try {
       const message = JSON.parse(event.nativeEvent.data) as { type?: string; data?: LoginResponse };
       if (message.type === "login" && message.data?.access) {
@@ -62,10 +91,21 @@ export default function WebAuthLoginScreen({ navigation }: WebAuthLoginScreenPro
   };
 
   const handleNav = (nav: WebViewNavigation) => {
-    if (!nav.url.includes("/select-tenant")) {
+    if (isTrustedAuthUrl(nav.url)) {
+      lastTrustedUrl.current = nav.url;
+    }
+    if (!shouldReadCapturedLogin(nav.url)) {
       return;
     }
     webRef.current?.injectJavaScript(READ_CAPTURED_LOGIN_JS);
+  };
+
+  const injectHookIfTrusted = (url?: string) => {
+    if (!isTrustedAuthUrl(url)) {
+      return;
+    }
+    lastTrustedUrl.current = url as string;
+    webRef.current?.injectJavaScript(WEB_LOGIN_CAPTURE_HOOK);
   };
 
   return (
@@ -77,36 +117,41 @@ export default function WebAuthLoginScreen({ navigation }: WebAuthLoginScreenPro
         <Text style={styles.headerTitle}>Sign in to Glance</Text>
         <View style={styles.headerSpacer} />
       </View>
-      <WebView
-        ref={webRef}
-        source={{ uri: WEB_LOGIN_URL }}
-        startInLoadingState
-        javaScriptEnabled
-        domStorageEnabled
-        sharedCookiesEnabled
-        thirdPartyCookiesEnabled
-        mixedContentMode="always"
-        setSupportMultipleWindows={false}
-        originWhitelist={["http://*", "https://*"]}
-        onShouldStartLoadWithRequest={() => true}
-        injectedJavaScriptBeforeContentLoaded={WEB_LOGIN_CAPTURE_HOOK}
-        onLoadEnd={() => webRef.current?.injectJavaScript(WEB_LOGIN_CAPTURE_HOOK)}
-        onMessage={handleMessage}
-        onNavigationStateChange={handleNav}
-        onError={(event) => {
-          const native = event.nativeEvent;
-          setPageError(
-            native.description ||
-              `Could not open ${WEB_LOGIN_URL} (${native.code ?? "unknown error"}).`
-          );
-        }}
-        renderLoading={() => (
-          <View style={styles.loading}>
-            <ActivityIndicator size="large" color={colors.brand} />
-            <Text style={styles.loadingText}>Opening sign-in window...</Text>
-          </View>
-        )}
-      />
+      {httpsOk ? (
+        <WebView
+          ref={webRef}
+          source={{ uri: WEB_LOGIN_URL }}
+          startInLoadingState
+          javaScriptEnabled
+          javaScriptCanOpenWindowsAutomatically={false}
+          domStorageEnabled
+          sharedCookiesEnabled
+          thirdPartyCookiesEnabled
+          allowFileAccess={false}
+          allowFileAccessFromFileURLs={false}
+          mixedContentMode={loginMixedContentMode()}
+          setSupportMultipleWindows={false}
+          originWhitelist={loginOriginWhitelist()}
+          onShouldStartLoadWithRequest={shouldAllowAuthNavigation}
+          injectedJavaScriptBeforeContentLoaded={WEB_LOGIN_CAPTURE_HOOK}
+          onLoadEnd={(event) => injectHookIfTrusted(event.nativeEvent.url)}
+          onMessage={handleMessage}
+          onNavigationStateChange={handleNav}
+          onError={(event) => {
+            const native = event.nativeEvent;
+            setPageError(
+              native.description ||
+                `Could not open ${WEB_LOGIN_URL} (${native.code ?? "unknown error"}).`
+            );
+          }}
+          renderLoading={() => (
+            <View style={styles.loading}>
+              <ActivityIndicator size="large" color={colors.brand} />
+              <Text style={styles.loadingText}>Opening sign-in window...</Text>
+            </View>
+          )}
+        />
+      ) : null}
       {pageError ? (
         <View style={styles.errorBanner}>
           <Text style={styles.errorTitle}>Could not reach Glance sign-in</Text>

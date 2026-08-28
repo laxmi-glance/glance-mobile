@@ -20,7 +20,7 @@ pnpm install
 |---|---|---|
 | `start:local` | `http://localhost:8000/api` (Android emulator: `http://10.0.2.2:8000/api`) | `http://localhost:3000` |
 | `start:staging` and EAS `preview` | `https://api.staging.glancewise.app/api` | `https://staging.glancewise.app` |
-| `start:production` | `https://api.glancewise.app/api` | `https://app.glancewise.app` |
+| `start:production` | `https://api.glancewise.app/api` | `https://glancewise.app` |
 
 In local mode, `localhost` is rewritten to Expo’s LAN IP so a physical phone can reach Django and the web login page.
 

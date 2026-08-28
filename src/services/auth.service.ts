@@ -1,6 +1,14 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { apiClient } from "../config/api";
-import { StorageKeys, clearSession, getJson, setJson } from "../core/storage";
+import {
+  StorageKeys,
+  clearSession,
+  getAccessToken,
+  getJson,
+  getRefreshToken,
+  setJson,
+  setTokenPair,
+} from "../core/storage";
 import { userIdFromAccessToken } from "../utils/jwt";
 import rbacService from "./rbac.service";
 import type {
@@ -19,13 +27,12 @@ export interface LoginCredentials {
 
 class AuthService {
   async persistLoginSession(data: LoginResponse): Promise<void> {
-    await AsyncStorage.multiSet([
-      [StorageKeys.accessToken, data.access],
-      [StorageKeys.refreshToken, data.refresh],
-    ]);
+    await setTokenPair(data.access, data.refresh);
     const userId = userIdFromAccessToken(data.access);
     if (userId) {
       await AsyncStorage.setItem(StorageKeys.userId, userId);
+    } else {
+      await AsyncStorage.removeItem(StorageKeys.userId);
     }
     await AsyncStorage.removeItem(StorageKeys.tenantId);
     await AsyncStorage.removeItem(StorageKeys.selectedTenant);
@@ -52,11 +59,8 @@ class AuthService {
       tenant_id: tenantId,
     });
 
-    await AsyncStorage.multiSet([
-      [StorageKeys.accessToken, data.access],
-      [StorageKeys.refreshToken, data.refresh],
-      [StorageKeys.tenantId, tenantId],
-    ]);
+    await setTokenPair(data.access, data.refresh);
+    await AsyncStorage.setItem(StorageKeys.tenantId, tenantId);
 
     const userId = userIdFromAccessToken(data.access);
     if (userId) {
@@ -80,7 +84,7 @@ class AuthService {
   }
 
   async logout(): Promise<void> {
-    const refresh = await AsyncStorage.getItem(StorageKeys.refreshToken);
+    const refresh = await getRefreshToken();
     try {
       if (refresh) {
         await apiClient.post("/users/logout/", { refresh });
@@ -93,7 +97,7 @@ class AuthService {
   }
 
   async isAuthenticated(): Promise<boolean> {
-    const token = await AsyncStorage.getItem(StorageKeys.accessToken);
+    const token = await getAccessToken();
     return Boolean(token);
   }
 
@@ -111,7 +115,7 @@ class AuthService {
     if (stored) {
       return stored;
     }
-    const token = await AsyncStorage.getItem(StorageKeys.accessToken);
+    const token = await getAccessToken();
     const userId = userIdFromAccessToken(token);
     if (userId) {
       await AsyncStorage.setItem(StorageKeys.userId, userId);
