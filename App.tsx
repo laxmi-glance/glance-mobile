@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   DarkTheme,
   DefaultTheme,
@@ -7,7 +7,7 @@ import {
 } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { StatusBar } from "expo-status-bar";
-import { ActivityIndicator, View, StyleSheet, Text } from "react-native";
+import { ActivityIndicator, AppState, View, StyleSheet, Text } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useFonts } from "expo-font";
@@ -20,9 +20,11 @@ import {
 } from "@expo-google-fonts/urbanist";
 import { RootStackParamList } from "./src/types/navigation";
 import authService from "./src/services/auth.service";
+import { isEnabled as isBiometricEnabled } from "./src/services/biometric.service";
 import { onSessionExpired } from "./src/core/sessionEvents";
 import { ThemeProvider, colors, navigationFonts, type, useAppTheme } from "./src/theme";
 import BrandMark from "./src/components/BrandMark";
+import BiometricLock from "./src/components/BiometricLock";
 import LoginScreen from "./src/screens/LoginScreen";
 import WebAuthLoginScreen from "./src/screens/WebAuthLoginScreen";
 import CompanySelectionScreen from "./src/screens/CompanySelectionScreen";
@@ -36,6 +38,7 @@ import MainTabs from "./src/navigation/MainTabs";
 import rbacService from "./src/services/rbac.service";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+const BACKGROUND_LOCK_MS = 45_000;
 
 function Splash() {
   return (
@@ -50,6 +53,7 @@ function Splash() {
 export default function App() {
   const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [locked, setLocked] = useState(false);
   const [initialRoute, setInitialRoute] = useState<keyof RootStackParamList>("Login");
   const [fontsLoaded, fontError] = useFonts({
     Urbanist_400Regular,
@@ -58,12 +62,55 @@ export default function App() {
     Urbanist_700Bold,
     Urbanist_800ExtraBold,
   });
+  const backgroundedAt = useRef<number | null>(null);
+
+  const unlock = useCallback(() => {
+    setLocked(false);
+  }, []);
+
+  const signInElsewhere = useCallback(async () => {
+    await authService.logout();
+    setLocked(false);
+    navigationRef.current?.reset({ index: 0, routes: [{ name: "Login" }] });
+  }, []);
 
   useEffect(() => {
     checkAuthStatus();
     return onSessionExpired(() => {
+      setLocked(false);
       navigationRef.current?.reset({ index: 0, routes: [{ name: "Login" }] });
     });
+  }, []);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (next) => {
+      if (next === "background") {
+        backgroundedAt.current = Date.now();
+        return;
+      }
+      if (next !== "active") {
+        return;
+      }
+      const started = backgroundedAt.current;
+      backgroundedAt.current = null;
+      if (!started || Date.now() - started < BACKGROUND_LOCK_MS) {
+        return;
+      }
+      const routeName = navigationRef.current?.getCurrentRoute()?.name;
+      if (routeName === "Login" || routeName === "WebAuthLogin") {
+        return;
+      }
+      void (async () => {
+        const [authed, on] = await Promise.all([
+          authService.isAuthenticated(),
+          isBiometricEnabled(),
+        ]);
+        if (authed && on) {
+          setLocked(true);
+        }
+      })();
+    });
+    return () => sub.remove();
   }, []);
 
   const checkAuthStatus = async () => {
@@ -71,15 +118,21 @@ export default function App() {
       const isAuthenticated = await authService.isAuthenticated();
       if (!isAuthenticated) {
         setInitialRoute("Login");
+        setLocked(false);
         return;
       }
-      const hasTenant = await authService.hasSelectedTenant();
+      const [hasTenant, biometricOn] = await Promise.all([
+        authService.hasSelectedTenant(),
+        isBiometricEnabled(),
+      ]);
       setInitialRoute(hasTenant ? "Main" : "CompanySelection");
+      setLocked(biometricOn);
       if (hasTenant) {
         void rbacService.sync().catch(() => undefined);
       }
     } catch {
       setInitialRoute("Login");
+      setLocked(false);
     } finally {
       setIsLoading(false);
     }
@@ -95,7 +148,12 @@ export default function App() {
           {showSplash ? (
             <Splash />
           ) : (
-            <ThemedNavigation navigationRef={navigationRef} initialRoute={initialRoute} />
+            <>
+              <ThemedNavigation navigationRef={navigationRef} initialRoute={initialRoute} />
+              {locked ? (
+                <BiometricLock onUnlock={unlock} onSignInElsewhere={() => void signInElsewhere()} />
+              ) : null}
+            </>
           )}
         </ThemeProvider>
       </SafeAreaProvider>

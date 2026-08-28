@@ -18,7 +18,8 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "Glancewise uses the camera to capture invoices and receipts.",
-        "NSPhotoLibraryUsageDescription": "Glancewise uses your photo library to upload invoices and receipts."
+        "NSPhotoLibraryUsageDescription": "Glancewise uses your photo library to upload invoices and receipts.",
+        "NSFaceIDUsageDescription": "Glancewise uses Face ID to unlock the app after you sign in."
       }
     },
     "android": {
@@ -56,7 +57,13 @@
       ],
       "expo-document-picker",
       "expo-font",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Glancewise uses Face ID to unlock the app after you sign in."
+        }
+      ]
     ],
     "extra": {
       "apiBaseUrl": "",

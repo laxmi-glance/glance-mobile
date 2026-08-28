@@ -15,6 +15,7 @@ import {
   shouldReadCapturedLogin,
 } from "../auth/webAuthOrigins";
 import authService from "../services/auth.service";
+import { offerEnableAfterLogin } from "../services/biometric.service";
 import type { LoginResponse } from "../types/models";
 import { useAppTheme, useThemedStyles, type ThemeTokens } from "../theme";
 
@@ -63,6 +64,7 @@ export default function WebAuthLoginScreen({ navigation }: WebAuthLoginScreenPro
         navigation.goBack();
         return;
       }
+      offerEnableAfterLogin();
       navigation.reset({ index: 0, routes: [{ name: "CompanySelection" }] });
     } catch {
       settled.current = false;

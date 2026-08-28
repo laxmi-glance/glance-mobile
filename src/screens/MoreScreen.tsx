@@ -8,6 +8,7 @@ import {
   Linking,
   Image,
   TouchableOpacity,
+  Switch,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
@@ -18,6 +19,14 @@ import type { Tenant, UserProfile } from "../types/models";
 import { apiErrorMessage } from "../utils/errors";
 import { API_ENV, FRONTEND_URL } from "../config/env";
 import { APP_FEATURES, comingSoonCopy } from "../config/features";
+import {
+  authenticate,
+  enableWithPrompt,
+  getCapability,
+  isEnabled,
+  setEnabled,
+  type BiometricCapability,
+} from "../services/biometric.service";
 import Screen from "../components/Screen";
 import PageHeader from "../components/PageHeader";
 import ListRow from "../components/ListRow";
@@ -55,6 +64,16 @@ export default function MoreScreen({ navigation }: MoreScreenProps) {
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [loading, setLoading] = useState(true);
   const [photoFailed, setPhotoFailed] = useState(false);
+  const [biometricOn, setBiometricOn] = useState(false);
+  const [biometric, setBiometric] = useState<BiometricCapability | null>(null);
+
+  useEffect(() => {
+    void (async () => {
+      const [capability, enabled] = await Promise.all([getCapability(), isEnabled()]);
+      setBiometric(capability);
+      setBiometricOn(enabled);
+    })();
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -104,6 +123,30 @@ export default function MoreScreen({ navigation }: MoreScreenProps) {
 
   const handleOpenSettings = () => {
     void Linking.openURL(PROFILE_WEB_URL);
+  };
+
+  const handleBiometricToggle = async (next: boolean) => {
+    if (!biometric?.available) {
+      Alert.alert(
+        "Biometrics unavailable",
+        "Set up Face ID, Touch ID, or a fingerprint in device settings, then try again."
+      );
+      return;
+    }
+    if (next) {
+      const ok = await enableWithPrompt();
+      setBiometricOn(ok);
+      if (!ok) {
+        Alert.alert(`${biometric.label} not enabled`, "Confirm with biometrics to turn this on.");
+      }
+      return;
+    }
+    const ok = await authenticate(`Turn off ${biometric.label} unlock`);
+    if (!ok) {
+      return;
+    }
+    await setEnabled(false);
+    setBiometricOn(false);
   };
 
   if (loading) {
@@ -204,6 +247,31 @@ export default function MoreScreen({ navigation }: MoreScreenProps) {
 
         <Text style={styles.section}>Appearance</Text>
         <ThemePicker />
+
+        <Text style={styles.section}>Security</Text>
+        <ListRow
+          icon="finger-print-outline"
+          label={biometric?.label ? `Unlock with ${biometric.label}` : "Biometric unlock"}
+          subtitle={
+            !biometric
+              ? "Checking this device…"
+              : biometric.available
+                ? biometricOn
+                  ? "Required when opening the app"
+                  : "Use after you sign in once"
+                : "Set up biometrics in device settings first"
+          }
+          right={
+            <Switch
+              value={biometricOn}
+              onValueChange={(value) => void handleBiometricToggle(value)}
+              disabled={!biometric?.available}
+              trackColor={{ false: colors.borderStrong, true: colors.brand }}
+              thumbColor={colors.white}
+              accessibilityLabel="Biometric unlock"
+            />
+          }
+        />
 
         <Text style={styles.section}>Workspace</Text>
         <ListRow
