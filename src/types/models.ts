@@ -56,7 +56,7 @@ export type ApprovalStatus = "pending" | "approved" | "rejected";
 export type GLPostingStatus = "PENDING" | "POSTED" | "VOIDED";
 export type ValidationStatus = "full" | "partial" | "low" | "pending" | "failed";
 
-export interface VendorBrief {
+export interface PartyBrief {
   id: string;
   name: string;
   alias?: string | null;
@@ -79,9 +79,9 @@ export interface FinancialDocumentListItem {
   document_source?: string;
   invoice_number?: string | null;
   invoice_date?: string | null;
-  vendor?: VendorBrief | null;
-  suggested_vendor?: VendorBrief | null;
-  linked_to_vendor?: boolean | null;
+  party?: PartyBrief | null;
+  suggested_party?: PartyBrief | null;
+  linked_to_party?: boolean | null;
   line_total?: string | number | null;
   total?: string | number | null;
   tax?: string | number | null;

@@ -27,15 +27,3 @@ export function getDisplayFirstName(
   }
   return token.charAt(0).toUpperCase() + token.slice(1);
 }
-
-export function formatDashboardStamp(value?: string | null): string {
-  if (!value) {
-    return "—";
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${pad(date.getDate())}-${pad(date.getMonth() + 1)}-${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
