@@ -85,7 +85,7 @@ export function displayName(
 }
 
 export function vendorName(item: FinancialDocumentListItem): string {
-  return item.vendor?.name || item.suggested_vendor?.name || "No vendor yet";
+  return item.party?.name || item.suggested_party?.name || "No vendor yet";
 }
 
 export type ApprovalActionGate = {

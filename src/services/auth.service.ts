@@ -11,19 +11,7 @@ import {
 } from "../core/storage";
 import { userIdFromAccessToken } from "../utils/jwt";
 import rbacService from "./rbac.service";
-import type {
-  LoginResponse,
-  PendingInvitation,
-  Tenant,
-  TokenPair,
-  UserProfile,
-} from "../types/models";
-
-export interface LoginCredentials {
-  username: string;
-  password: string;
-  recaptchaToken?: string;
-}
+import type { LoginResponse, Tenant, TokenPair, UserProfile } from "../types/models";
 
 class AuthService {
   async persistLoginSession(data: LoginResponse): Promise<void> {
@@ -38,20 +26,6 @@ class AuthService {
     await AsyncStorage.removeItem(StorageKeys.selectedTenant);
     await AsyncStorage.removeItem(StorageKeys.rbacConfig);
     await setJson(StorageKeys.availableTenants, data.tenants ?? []);
-  }
-
-  async login(credentials: LoginCredentials): Promise<LoginResponse> {
-    const body: Record<string, string> = {
-      username: credentials.username.trim(),
-      password: credentials.password,
-    };
-    if (credentials.recaptchaToken) {
-      body.recaptcha_token = credentials.recaptchaToken;
-    }
-
-    const { data } = await apiClient.post<LoginResponse>("/users/login/", body);
-    await this.persistLoginSession(data);
-    return data;
   }
 
   async selectTenant(tenantId: string): Promise<TokenPair> {
@@ -121,10 +95,6 @@ class AuthService {
       await AsyncStorage.setItem(StorageKeys.userId, userId);
     }
     return userId;
-  }
-
-  async getPendingInvitations(): Promise<PendingInvitation[]> {
-    return [];
   }
 }
 

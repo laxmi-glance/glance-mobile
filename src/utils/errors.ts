@@ -32,11 +32,3 @@ export function apiErrorMessage(
   }
   return fallback;
 }
-
-export function apiErrorCode(error: unknown): string | null {
-  if (isAxiosError(error)) {
-    const code = (error.response?.data as { error_code?: string } | undefined)?.error_code;
-    return code ?? null;
-  }
-  return null;
-}

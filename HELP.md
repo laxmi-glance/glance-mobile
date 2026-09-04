@@ -1,4 +1,13 @@
-# Glancewise Mobile — Run & Build
+# Glancewise Mobile — run and build
+
+| Field | Value |
+|-------|-------|
+| **Document ID** | MO-DOC-011 |
+| **Version** | 2.0 |
+| **Owner** | Engineering |
+| **Last updated** | 2026-09-02 |
+| **Classification** | Internal |
+| **Audience** | Mobile developers, QA, release engineering |
 
 All commands run from `glance-mobile`. Use pnpm scripts. Expo CLI has no `start:staging` command.
 

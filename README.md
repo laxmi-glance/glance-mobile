@@ -2,6 +2,19 @@
 
 React Native (Expo) companion app for Glancewise. It uses the same tenant APIs as the web app.
 
+| Field | Value |
+|-------|-------|
+| **Document ID** | MO-DOC-010 |
+| **Version** | 2.0 |
+| **Owner** | Engineering |
+| **Last updated** | 2026-09-02 |
+| **Classification** | Internal |
+| **Audience** | Mobile developers, QA |
+
+## Purpose
+
+Product overview, auth contract, and quick start. Run/build/EAS procedures: **[HELP.md](./HELP.md)**. Full index: **[docs/README.md](docs/README.md)**.
+
 ## What this app does
 
 - Two-step login (`/users/login/` then `/users/select-tenant/`)
@@ -28,44 +41,45 @@ It is **not** a full replacement for the web product (no GL, reports, banking, b
 - Expo Go (device testing) or iOS Simulator / Android Emulator
 - A Glancewise backend (`dev` / staging) with `DISABLE_RECAPTCHA=true` until native reCAPTCHA is added
 
-## Install
+## Install and run
 
 ```bash
 cd glance-mobile
 pnpm install
+pnpm start:staging      # device testing against staging API
+pnpm start:local        # simulator/emulator + local Django
+pnpm start:production   # production API
 ```
 
-## API URL
+Do **not** use `npx expo start:staging` — Expo CLI has no such command; use pnpm scripts.
 
-Use an environment-specific start script. Do not use `npx expo start:staging` — Expo CLI has no such command.
+Then scan the QR code with Expo Go (physical device) or press `i` / `a` for simulators.
+
+## API environments
+
+Configured in `src/config/env.ts`. Override with `EXPO_PUBLIC_API_BASE_URL` when needed.
+
+| Script | API base | Web app |
+|--------|----------|---------|
+| `start:local` | iOS `http://localhost:8000/api` · Android emulator `http://10.0.2.2:8000/api` | — |
+| `start:staging` | `https://api.staging.glancewise.app/api` | `https://staging.glancewise.app` |
+| `start:production` | `https://api.glancewise.app/api` | `https://app.glancewise.app` |
+
+Physical devices cannot reach `localhost`. Use `start:staging` or:
 
 ```bash
-pnpm start:staging      # staging.glancewise.app
-pnpm start:local        # local Django
-pnpm start:production   # app.glancewise.app
+EXPO_PUBLIC_API_BASE_URL=http://YOUR_LAN_IP:8000/api pnpm start:local
 ```
 
-| Script | API |
-|---|---|
-| `start:local` | iOS `http://localhost:8000/api` · Android emulator `http://10.0.2.2:8000/api` |
-| `start:staging` | `https://staging.glancewise.app/api` |
-| `start:production` | `https://app.glancewise.app/api` |
+Staging login may require `DISABLE_RECAPTCHA=true` on the backend until native reCAPTCHA is wired.
 
-Override with `EXPO_PUBLIC_API_BASE_URL` if needed (e.g. phone + local backend):
+## Test flow (smoke)
 
-```bash
-EXPO_PUBLIC_API_BASE_URL=http://192.168.68.60:8000/api pnpm start:local
-```
-
-## Run & build
-
-Command reference (local, staging, tunnel, EAS APK/IPA): **[HELP.md](./HELP.md)**
-
-```bash
-pnpm start:staging
-pnpm ios
-pnpm android
-```
+1. Sign in with an existing Glancewise username (or email) and password
+2. Select a workspace
+3. Review the processing queue, pull to refresh, open a document
+4. Upload from camera, photos, or PDF
+5. Open Notifications and Account (switch workspace / sign out)
 
 ## Auth contract (matches glance-backend)
 
@@ -84,22 +98,11 @@ pnpm android
 - `GET /api/document-processing/preprocessing/{uuid}/`
 - `POST /api/document-processing/preprocessing/{uuid}/retry/`
 - `POST /api/financial-document/upload-financial-documents/` (multipart field `documents`)
-- `GET /api/users/notifications/`
-- `GET /api/users/notifications/unread-count/`
-- `POST /api/users/notifications/{id}/mark-read/`
-- `POST /api/users/notifications/mark-all-read/`
+- `GET /api/users/notifications/` and mark-read endpoints
 
 ## Store builds (EAS)
 
-```bash
-pnpm add -g eas-cli
-eas login
-eas build:configure
-eas build --platform android --profile preview   # internal APK
-eas build --platform ios --profile preview       # TestFlight / ad hoc
-```
-
-Production store binaries use `--profile production`.
+See [HELP.md](./HELP.md) for EAS profiles, tunnel QA, and troubleshooting.
 
 ## Project structure
 
@@ -114,6 +117,9 @@ src/
   utils/
 ```
 
-## License
+## Revision history
 
-Proprietary — Glancewise
+| Date | Version | Author | Summary |
+|------|---------|--------|---------|
+| 2026-09-02 | 2.0 | Engineering | Merged GETTING_STARTED; aligned API URLs with env.ts |
+| 2026-06-01 | 1.0 | Engineering | Initial README |
