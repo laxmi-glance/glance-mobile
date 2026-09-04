@@ -1,172 +1,234 @@
-import React, { useEffect, useRef, useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from "react-native";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { View, Text, TouchableOpacity, AppState, Alert, Linking } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { WebView, type WebViewMessageEvent, type WebViewNavigation } from "react-native-webview";
 import { WebAuthLoginScreenProps } from "../types/navigation";
-import { WEB_LOGIN_URL } from "../config/env";
-import { READ_CAPTURED_LOGIN_JS, WEB_LOGIN_CAPTURE_HOOK } from "../auth/webLoginHook";
-import {
-  isAuthFlowPath,
-  isHttpsLoginConfigured,
-  isTrustedAuthUrl,
-  loginMixedContentMode,
-  loginOriginWhitelist,
-  shouldAllowAuthNavigation,
-  shouldReadCapturedLogin,
-} from "../auth/webAuthOrigins";
+import { FRONTEND_URL } from "../config/env";
+import { apiClient } from "../config/api";
 import authService from "../services/auth.service";
 import { offerEnableAfterLogin } from "../services/biometric.service";
 import type { LoginResponse } from "../types/models";
-import { useAppTheme, useThemedStyles, type ThemeTokens } from "../theme";
+import Button from "../components/Button";
+import { useThemedStyles, type ThemeTokens } from "../theme";
 
 const AUTH_TIMEOUT_MS = 10 * 60 * 1000;
+const POLL_MS = 1500;
+
+type StartResponse = {
+  session_id: string;
+  session_secret: string;
+  login_path: string;
+  user_code: string;
+};
+
+let startGeneration = 0;
+
+function buildAppLoginUrl(frontendUrl: string, loginPath: string): string {
+  const origin = String(frontendUrl || "").replace(/\/+$/, "");
+  if (!/^https?:\/\//i.test(origin)) {
+    throw new Error("Web sign-in URL is not configured.");
+  }
+  if (!loginPath.startsWith("/app-login")) {
+    throw new Error("Invalid sign-in path from the server.");
+  }
+  const parsed = new URL(loginPath, `${origin}/`);
+  const expected = new URL(origin);
+  if (parsed.origin !== expected.origin || parsed.pathname !== "/app-login") {
+    throw new Error("Invalid sign-in path from the server.");
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error("Invalid sign-in URL.");
+  }
+  return parsed.toString();
+}
 
 export default function WebAuthLoginScreen({ navigation }: WebAuthLoginScreenProps) {
-  const { colors } = useAppTheme();
   const styles = useThemedStyles(createStyles);
-  const webRef = useRef<WebView>(null);
   const settled = useRef(false);
-  const lastTrustedUrl = useRef(WEB_LOGIN_URL);
-  const [pageError, setPageError] = useState("");
-  const httpsOk = isHttpsLoginConfigured();
+  const pollInFlight = useRef(false);
+  const sessionRef = useRef<StartResponse | null>(null);
+  const [statusText, setStatusText] = useState("Opening your browser...");
+  const [userCode, setUserCode] = useState("");
+  const [canRetry, setCanRetry] = useState(false);
 
-  useEffect(() => {
-    if (!httpsOk) {
-      setPageError("Sign-in must use HTTPS in this environment.");
-    }
-  }, [httpsOk]);
+  const finishSuccess = useCallback(
+    async (data: LoginResponse) => {
+      if (settled.current || !data?.access) {
+        return;
+      }
+      settled.current = true;
+      try {
+        await authService.persistLoginSession(data);
+        if (!data.tenants?.length) {
+          Alert.alert(
+            "No workspaces",
+            "Your account has no active company memberships yet. Accept an invitation on the web app, then try again."
+          );
+          navigation.goBack();
+          return;
+        }
+        offerEnableAfterLogin();
+        navigation.reset({ index: 0, routes: [{ name: "CompanySelection" }] });
+      } catch {
+        settled.current = false;
+        Alert.alert("Sign in failed", "Could not save your session. Please try again.");
+      }
+    },
+    [navigation]
+  );
 
-  useEffect(() => {
-    if (!httpsOk) {
+  const cancelSession = useCallback(async (session?: StartResponse | null) => {
+    const target = session || sessionRef.current;
+    if (!target) {
       return;
     }
-    const timer = setTimeout(() => {
+    try {
+      await apiClient.post("/users/app-login/cancel/", {
+        session_id: target.session_id,
+        session_secret: target.session_secret,
+      });
+    } catch {
+      // Best-effort cancel.
+    }
+  }, []);
+
+  const pollOnce = useCallback(async () => {
+    const session = sessionRef.current;
+    if (!session || settled.current || pollInFlight.current) {
+      return;
+    }
+    pollInFlight.current = true;
+    try {
+      const { data, status } = await apiClient.post<LoginResponse | { status?: string; detail?: string }>(
+        "/users/app-login/poll/",
+        {
+          session_id: session.session_id,
+          session_secret: session.session_secret,
+        },
+        { validateStatus: () => true }
+      );
+      if (status === 200 && data && "access" in data && data.access) {
+        await finishSuccess(data);
+        return;
+      }
+      if (status === 409 && !settled.current) {
+        settled.current = true;
+        Alert.alert("Sign in ended", ("detail" in data && data.detail) || "Please try again.");
+        navigation.goBack();
+      }
+    } finally {
+      pollInFlight.current = false;
+    }
+  }, [finishSuccess, navigation]);
+
+  const openBrowser = useCallback(async (loginPath: string) => {
+    const loginUrl = buildAppLoginUrl(FRONTEND_URL, loginPath);
+    const canOpen = await Linking.canOpenURL(loginUrl);
+    if (!canOpen) {
+      throw new Error(`Cannot open ${loginUrl}`);
+    }
+    await Linking.openURL(loginUrl);
+  }, []);
+
+  useEffect(() => {
+    const generation = ++startGeneration;
+    let cancelled = false;
+    settled.current = false;
+    setCanRetry(false);
+    setUserCode("");
+    setStatusText("Opening your browser...");
+
+    (async () => {
+      try {
+        const { data } = await apiClient.post<StartResponse>("/users/app-login/start/", { client: "mobile" });
+        if (cancelled || generation !== startGeneration) {
+          await cancelSession(data);
+          return;
+        }
+        sessionRef.current = data;
+        if (!data.user_code) {
+          throw new Error("Sign-in session did not include a confirmation code.");
+        }
+        setUserCode(data.user_code);
+        await openBrowser(data.login_path);
+        if (cancelled || generation !== startGeneration) {
+          return;
+        }
+        setStatusText("Enter this code in your browser, then finish sign in there.");
+        setCanRetry(true);
+      } catch (error) {
+        if (!cancelled && generation === startGeneration) {
+          Alert.alert("Could not start sign in", error?.message || "Please try again.");
+          navigation.goBack();
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [cancelSession, navigation, openBrowser]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      void pollOnce().catch(() => undefined);
+    }, POLL_MS);
+    const timeout = setTimeout(() => {
       if (!settled.current) {
+        void cancelSession();
         Alert.alert("Sign in timed out", "Please try again.");
         navigation.goBack();
       }
     }, AUTH_TIMEOUT_MS);
-    return () => clearTimeout(timer);
-  }, [httpsOk, navigation]);
+    return () => {
+      clearInterval(timer);
+      clearTimeout(timeout);
+    };
+  }, [cancelSession, navigation, pollOnce]);
 
-  const finishSuccess = async (data: LoginResponse) => {
-    if (settled.current || !data?.access) {
-      return;
-    }
-    settled.current = true;
-    try {
-      await authService.persistLoginSession(data);
-      if (!data.tenants?.length) {
-        Alert.alert(
-          "No workspaces",
-          "Your account has no active company memberships yet. Accept an invitation on the web app, then try again."
-        );
-        navigation.goBack();
-        return;
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (next) => {
+      if (next === "active") {
+        void pollOnce().catch(() => undefined);
       }
-      offerEnableAfterLogin();
-      navigation.reset({ index: 0, routes: [{ name: "CompanySelection" }] });
-    } catch {
-      settled.current = false;
-      Alert.alert("Sign in failed", "Could not save your session. Please try again.");
-    }
-  };
-
-  const handleMessage = (event: WebViewMessageEvent) => {
-    const messageUrl = event.nativeEvent.url?.trim();
-    const trustedPage =
-      isTrustedAuthUrl(messageUrl) ||
-      (!messageUrl &&
-        isTrustedAuthUrl(lastTrustedUrl.current) &&
-        isAuthFlowPath(lastTrustedUrl.current));
-    if (!trustedPage) {
-      return;
-    }
-    try {
-      const message = JSON.parse(event.nativeEvent.data) as { type?: string; data?: LoginResponse };
-      if (message.type === "login" && message.data?.access) {
-        void finishSuccess(message.data);
-      }
-    } catch {
-      // Ignore unrelated page messages.
-    }
-  };
-
-  const handleNav = (nav: WebViewNavigation) => {
-    if (isTrustedAuthUrl(nav.url)) {
-      lastTrustedUrl.current = nav.url;
-    }
-    if (!shouldReadCapturedLogin(nav.url)) {
-      return;
-    }
-    webRef.current?.injectJavaScript(READ_CAPTURED_LOGIN_JS);
-  };
-
-  const injectHookIfTrusted = (url?: string) => {
-    if (!isTrustedAuthUrl(url)) {
-      return;
-    }
-    lastTrustedUrl.current = url as string;
-    webRef.current?.injectJavaScript(WEB_LOGIN_CAPTURE_HOOK);
-  };
+    });
+    const linking = Linking.addEventListener("url", () => {
+      void pollOnce().catch(() => undefined);
+    });
+    return () => {
+      sub.remove();
+      linking.remove();
+    };
+  }, [pollOnce]);
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
+    <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={8}>
+        <TouchableOpacity
+          onPress={() => {
+            void cancelSession();
+            navigation.goBack();
+          }}
+          hitSlop={8}
+        >
           <Text style={styles.close}>Cancel</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Sign in to Glance</Text>
         <View style={styles.headerSpacer} />
       </View>
-      {httpsOk ? (
-        <WebView
-          ref={webRef}
-          source={{ uri: WEB_LOGIN_URL }}
-          startInLoadingState
-          javaScriptEnabled
-          javaScriptCanOpenWindowsAutomatically={false}
-          domStorageEnabled
-          sharedCookiesEnabled
-          thirdPartyCookiesEnabled
-          allowFileAccess={false}
-          allowFileAccessFromFileURLs={false}
-          mixedContentMode={loginMixedContentMode()}
-          setSupportMultipleWindows={false}
-          originWhitelist={loginOriginWhitelist()}
-          onShouldStartLoadWithRequest={shouldAllowAuthNavigation}
-          injectedJavaScriptBeforeContentLoaded={WEB_LOGIN_CAPTURE_HOOK}
-          onLoadEnd={(event) => injectHookIfTrusted(event.nativeEvent.url)}
-          onMessage={handleMessage}
-          onNavigationStateChange={handleNav}
-          onError={(event) => {
-            const native = event.nativeEvent;
-            setPageError(
-              native.description ||
-                `Could not open ${WEB_LOGIN_URL} (${native.code ?? "unknown error"}).`
-            );
-          }}
-          renderLoading={() => (
-            <View style={styles.loading}>
-              <ActivityIndicator size="large" color={colors.brand} />
-              <Text style={styles.loadingText}>Opening sign-in window...</Text>
-            </View>
-          )}
-        />
-      ) : null}
-      {pageError ? (
-        <View style={styles.errorBanner}>
-          <Text style={styles.errorTitle}>Could not reach Glance sign-in</Text>
-          <Text style={styles.errorUrl}>{WEB_LOGIN_URL}</Text>
-          <Text style={styles.errorBody}>{pageError}</Text>
-          <Text style={styles.errorHint}>
-            A phone cannot reach localhost on your computer. Use the same Wi-Fi as this machine,
-            keep the web app running, and retry. The sign-in URL should be your LAN IP (shown as
-            {' "On Your Network" '}
-            in glance-frontend), not localhost.
-          </Text>
-        </View>
-      ) : null}
+      <View style={styles.body}>
+        <Text style={styles.title}>Waiting for browser sign-in</Text>
+        <Text style={styles.lead}>{statusText}</Text>
+        {userCode ? <Text style={styles.userCode}>{userCode}</Text> : null}
+        {canRetry && sessionRef.current ? (
+          <Button
+            label="Open browser again"
+            onPress={() => {
+              void openBrowser(sessionRef.current!.login_path).catch(() => undefined);
+            }}
+            icon="open-outline"
+          />
+        ) : null}
+      </View>
     </SafeAreaView>
   );
 }
@@ -198,42 +260,26 @@ function createStyles({ colors, type }: ThemeTokens) {
     headerSpacer: {
       width: 64,
     },
-    loading: {
-      ...StyleSheet.absoluteFillObject,
-      backgroundColor: colors.surface,
-      justifyContent: "center",
-      alignItems: "center",
+    body: {
+      flex: 1,
+      paddingHorizontal: 24,
+      paddingTop: 32,
     },
-    loadingText: {
+    title: {
+      ...type.title,
+      marginBottom: 12,
+    },
+    lead: {
       ...type.callout,
-      marginTop: 12,
       color: colors.textSecondary,
+      marginBottom: 24,
     },
-    errorBanner: {
-      paddingHorizontal: 16,
-      paddingVertical: 14,
-      borderTopWidth: 1,
-      borderTopColor: colors.border,
-      backgroundColor: colors.dangerSoft,
+    userCode: {
+      ...type.title,
+      letterSpacing: 4,
+      textAlign: "center" as const,
+      marginBottom: 24,
+      fontVariant: ["tabular-nums"],
     },
-    errorTitle: {
-      ...type.cardTitle,
-      color: colors.danger,
-    },
-    errorUrl: {
-      ...type.label,
-      marginTop: 6,
-      color: colors.textHeading,
-    },
-    errorBody: {
-      ...type.meta,
-      marginTop: 6,
-      color: colors.text,
-    },
-    errorHint: {
-      ...type.caption,
-      marginTop: 8,
-      color: colors.textSecondary,
-    },
-  };
+  } as const;
 }

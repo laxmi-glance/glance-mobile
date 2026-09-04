@@ -28,8 +28,8 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
       <SafeAreaView style={styles.sheet} edges={["bottom"]}>
         <Text style={styles.title}>Sign in</Text>
         <Text style={styles.lead}>
-          Connect this app to your Glance workspace. You will finish login in a secure Glance
-          window, then return here.
+          Connect this app to your Glance workspace. You will finish login in your browser,
+          including 2FA if it is enabled, then return here.
         </Text>
 
         <Button

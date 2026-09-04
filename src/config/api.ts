@@ -13,6 +13,8 @@ import type { TokenPair } from "../types/models";
 
 const PUBLIC_PATHS = [
   "/users/login/",
+  "/users/login/mfa-verify/",
+  "/users/app-login/",
   "/users/token/refresh/",
   "/users/logout/",
   "/users/signup/",
