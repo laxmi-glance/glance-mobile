@@ -2,7 +2,6 @@
   "expo": {
     "name": "Glancewise",
     "slug": "glancewise-mobile",
-    "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
