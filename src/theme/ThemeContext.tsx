@@ -64,17 +64,20 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const getThemeWriteEpoch = useCallback(() => writeEpochRef.current, []);
 
-  const applyFromPreferences = useCallback(async (prefs: { theme?: unknown }, fetchEpoch: number) => {
-    if (patchInFlightRef.current || fetchEpoch !== writeEpochRef.current) {
-      return;
-    }
-    const next = prefs?.theme;
-    if (!isMode(next) || next === modeRef.current) {
-      return;
-    }
-    setMode(next);
-    setResolvedTheme(resolveTheme(next));
-  }, []);
+  const applyFromPreferences = useCallback(
+    async (prefs: { theme?: unknown }, fetchEpoch: number) => {
+      if (patchInFlightRef.current || fetchEpoch !== writeEpochRef.current) {
+        return;
+      }
+      const next = prefs?.theme;
+      if (!isMode(next) || next === modeRef.current) {
+        return;
+      }
+      setMode(next);
+      setResolvedTheme(resolveTheme(next));
+    },
+    []
+  );
 
   const hydrateFromServer = useCallback(async () => {
     if (hydrateInFlightRef.current) {
