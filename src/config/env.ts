@@ -131,8 +131,6 @@ export const FRONTEND_URL = withDevLanHost(
     FRONTEND_HOSTS[API_ENV]
 );
 
-export const WEB_LOGIN_URL = `${FRONTEND_URL.replace(/\/+$/, "")}/login`;
-
 export const API_TIMEOUT_MS = 30000;
 export const UPLOAD_TIMEOUT_MS = 120000;
 
