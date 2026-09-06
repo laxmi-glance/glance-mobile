@@ -17,7 +17,6 @@ type StartResponse = {
   session_id: string;
   session_secret: string;
   login_path: string;
-  user_code: string;
 };
 
 let startGeneration = 0;
@@ -47,7 +46,6 @@ export default function WebAuthLoginScreen({ navigation }: WebAuthLoginScreenPro
   const pollInFlight = useRef(false);
   const sessionRef = useRef<StartResponse | null>(null);
   const [statusText, setStatusText] = useState("Opening your browser...");
-  const [userCode, setUserCode] = useState("");
   const [canRetry, setCanRetry] = useState(false);
 
   const finishSuccess = useCallback(
@@ -134,7 +132,6 @@ export default function WebAuthLoginScreen({ navigation }: WebAuthLoginScreenPro
     let cancelled = false;
     settled.current = false;
     setCanRetry(false);
-    setUserCode("");
     setStatusText("Opening your browser...");
 
     (async () => {
@@ -145,15 +142,11 @@ export default function WebAuthLoginScreen({ navigation }: WebAuthLoginScreenPro
           return;
         }
         sessionRef.current = data;
-        if (!data.user_code) {
-          throw new Error("Sign-in session did not include a confirmation code.");
-        }
-        setUserCode(data.user_code);
         await openBrowser(data.login_path);
         if (cancelled || generation !== startGeneration) {
           return;
         }
-        setStatusText("Enter this code in your browser, then finish sign in there.");
+        setStatusText("Finish sign in in your browser. This app continues automatically.");
         setCanRetry(true);
       } catch (error) {
         if (!cancelled && generation === startGeneration) {
@@ -218,7 +211,6 @@ export default function WebAuthLoginScreen({ navigation }: WebAuthLoginScreenPro
       <View style={styles.body}>
         <Text style={styles.title}>Waiting for browser sign-in</Text>
         <Text style={styles.lead}>{statusText}</Text>
-        {userCode ? <Text style={styles.userCode}>{userCode}</Text> : null}
         {canRetry && sessionRef.current ? (
           <Button
             label="Open browser again"
@@ -273,13 +265,6 @@ function createStyles({ colors, type }: ThemeTokens) {
       ...type.callout,
       color: colors.textSecondary,
       marginBottom: 24,
-    },
-    userCode: {
-      ...type.title,
-      letterSpacing: 4,
-      textAlign: "center" as const,
-      marginBottom: 24,
-      fontVariant: ["tabular-nums"],
     },
   } as const;
 }
