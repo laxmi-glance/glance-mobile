@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Animated, Easing, StyleSheet, View } from "react-native";
 
 const DOC = "#2C2C2C";
@@ -22,7 +22,7 @@ export default function ScanIcon({
   backgroundColor = "#FFFFFF",
   paused = false,
 }: Props) {
-  const progress = useRef(new Animated.Value(0)).current;
+  const [progress] = useState(() => new Animated.Value(0));
   const loopRef = useRef<Animated.CompositeAnimation | null>(null);
 
   const docW = size * 0.46;

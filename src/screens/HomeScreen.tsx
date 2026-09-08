@@ -84,6 +84,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         )}
       </ScrollView>
       <CustomizeDashboardModal
+        key={customizeOpen ? "open" : "closed"}
         open={customizeOpen}
         onClose={() => setCustomizeOpen(false)}
         layoutConfig={home.layoutConfig}

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -29,30 +29,47 @@ export default function NotificationsScreen({ navigation }: NotificationsScreenP
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const fetchGen = useRef(0);
+  const loadingMoreRef = useRef(false);
 
-  const load = async (pageNum = 1, replace = false) => {
+  const load = useCallback(async (pageNum = 1, replace = false) => {
+    const isReplace = replace || pageNum === 1;
+    if (isReplace) {
+      fetchGen.current += 1;
+    }
+    const gen = fetchGen.current;
     try {
       const data = await notificationService.list(pageNum);
+      if (gen !== fetchGen.current) {
+        return;
+      }
       setItems((prev) => mergeUniqueById(prev, data.results, replace || pageNum === 1));
       setHasMore(Boolean(data.next));
       setPage(pageNum);
     } catch (error: unknown) {
+      if (gen !== fetchGen.current) {
+        return;
+      }
       Alert.alert("Could not load notifications", apiErrorMessage(error));
     } finally {
+      if (gen !== fetchGen.current) {
+        return;
+      }
+      loadingMoreRef.current = false;
       setLoading(false);
       setRefreshing(false);
       setLoadingMore(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    load(1, true);
-  }, []);
+    void load(1, true); // eslint-disable-line react-hooks/set-state-in-effect -- load notifications after async API call
+  }, [load]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    load(1, true);
-  }, []);
+    void load(1, true);
+  }, [load]);
 
   const handleMarkAll = async () => {
     try {
@@ -113,10 +130,12 @@ export default function NotificationsScreen({ navigation }: NotificationsScreenP
         contentContainerStyle={styles.list}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         onEndReached={() => {
-          if (!loading && !loadingMore && hasMore) {
-            setLoadingMore(true);
-            load(page + 1);
+          if (loading || loadingMoreRef.current || refreshing || !hasMore) {
+            return;
           }
+          loadingMoreRef.current = true;
+          setLoadingMore(true);
+          void load(page + 1);
         }}
         onEndReachedThreshold={0.4}
         ListFooterComponent={loadingMore ? <ActivityIndicator style={styles.footer} /> : null}
@@ -182,7 +201,7 @@ function createStyles({ colors, type }: ThemeTokens) {
       marginTop: 8,
     },
     overlay: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
       backgroundColor: colors.overlay,
       justifyContent: "center",
       alignItems: "center",

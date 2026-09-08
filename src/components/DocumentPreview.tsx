@@ -75,24 +75,19 @@ export default function DocumentPreview({ url, fileName }: Props) {
   const styles = useThemedStyles(createStyles);
   const pdf = useMemo(() => isPdfSource(url, fileName), [url, fileName]);
   const image = useMemo(() => isImageSource(url, fileName), [url, fileName]);
-  const [pdfHtmlSource, setPdfHtmlSource] = useState<string | null>(null);
-  const [loading, setLoading] = useState(pdf);
-  const [error, setError] = useState("");
+  const [loadedPdf, setLoadedPdf] = useState<{ url: string; html: string } | null>(null);
+  const [loadError, setLoadError] = useState<{ url: string; message: string } | null>(null);
+  const [iosLoading, setIosLoading] = useState(true);
+  const pdfHtmlSource = loadedPdf?.url === url ? loadedPdf.html : null;
+  const error = loadError?.url === url ? loadError.message : "";
 
   useEffect(() => {
-    if (!pdf) {
-      setLoading(false);
+    if (!pdf || Platform.OS === "ios") {
       return;
     }
 
     let cancelled = false;
     const loadPdf = async () => {
-      if (Platform.OS === "ios") {
-        setLoading(false);
-        return;
-      }
-      setLoading(true);
-      setError("");
       try {
         const dest = `${FileSystem.cacheDirectory}${PAYABLE_PREVIEW_CACHE_NAME}`;
         const download = await FileSystem.downloadAsync(url, dest);
@@ -100,15 +95,11 @@ export default function DocumentPreview({ url, fileName }: Props) {
           encoding: FileSystem.EncodingType.Base64,
         });
         if (!cancelled) {
-          setPdfHtmlSource(pdfHtml(base64));
+          setLoadedPdf({ url, html: pdfHtml(base64) });
         }
       } catch {
         if (!cancelled) {
-          setError("Could not load the original document.");
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
+          setLoadError({ url, message: "Could not load the original document." });
         }
       }
     };
@@ -150,21 +141,23 @@ export default function DocumentPreview({ url, fileName }: Props) {
   if (pdf && Platform.OS === "ios") {
     return (
       <View style={styles.frame}>
-        {loading ? (
+        {iosLoading ? (
           <View style={styles.loading}>
             <ActivityIndicator color={colors.brand} />
           </View>
         ) : null}
         <WebView
+          key={url}
           source={{ uri: url }}
           originWhitelist={["*"]}
           startInLoadingState
           scalesPageToFit
           nestedScrollEnabled
-          onLoadEnd={() => setLoading(false)}
+          onLoadStart={() => setIosLoading(true)}
+          onLoadEnd={() => setIosLoading(false)}
           onError={() => {
-            setLoading(false);
-            setError("Could not load the original document.");
+            setIosLoading(false);
+            setLoadError({ url, message: "Could not load the original document." });
           }}
           renderLoading={() => (
             <View style={styles.loading}>
@@ -179,12 +172,7 @@ export default function DocumentPreview({ url, fileName }: Props) {
   if (pdf) {
     return (
       <View style={styles.frame}>
-        {loading || !pdfHtmlSource ? (
-          <View style={styles.loading}>
-            <ActivityIndicator color={colors.brand} />
-            <Text style={styles.loadingText}>Loading original document…</Text>
-          </View>
-        ) : (
+        {pdfHtmlSource ? (
           <WebView
             originWhitelist={["*"]}
             source={{ html: pdfHtmlSource, baseUrl: "https://cdnjs.cloudflare.com" }}
@@ -193,6 +181,11 @@ export default function DocumentPreview({ url, fileName }: Props) {
             scalesPageToFit
             setSupportMultipleWindows={false}
           />
+        ) : (
+          <View style={styles.loading}>
+            <ActivityIndicator color={colors.brand} />
+            <Text style={styles.loadingText}>Loading original document…</Text>
+          </View>
         )}
       </View>
     );
@@ -232,7 +225,7 @@ function createStyles({ colors, type }: ThemeTokens) {
       height: 460,
     },
     loading: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
       alignItems: "center",
       justifyContent: "center",
       backgroundColor: colors.surfaceMuted,

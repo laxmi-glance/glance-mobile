@@ -294,7 +294,7 @@ function Corner({ color, style }: { color: string; style: object }) {
 }
 
 function ScanLine({ height }: { height: number }) {
-  const progress = useRef(new Animated.Value(0)).current;
+  const [progress] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -497,7 +497,7 @@ const styles = StyleSheet.create({
     color: colors.textHeading,
   },
   busy: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(0,0,0,0.55)",
     alignItems: "center",
     justifyContent: "center",

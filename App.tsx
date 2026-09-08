@@ -74,13 +74,38 @@ export default function App() {
     navigationRef.current?.reset({ index: 0, routes: [{ name: "Login" }] });
   }, []);
 
+  const checkAuthStatus = useCallback(async () => {
+    try {
+      const isAuthenticated = await authService.isAuthenticated();
+      if (!isAuthenticated) {
+        setInitialRoute("Login");
+        setLocked(false);
+        return;
+      }
+      const [hasTenant, biometricOn] = await Promise.all([
+        authService.hasSelectedTenant(),
+        isBiometricEnabled(),
+      ]);
+      setInitialRoute(hasTenant ? "Main" : "CompanySelection");
+      setLocked(biometricOn);
+      if (hasTenant) {
+        void rbacService.sync().catch(() => undefined);
+      }
+    } catch {
+      setInitialRoute("Login");
+      setLocked(false);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    checkAuthStatus();
+    void checkAuthStatus(); // eslint-disable-line react-hooks/set-state-in-effect -- restore session after async auth checks
     return onSessionExpired(() => {
       setLocked(false);
       navigationRef.current?.reset({ index: 0, routes: [{ name: "Login" }] });
     });
-  }, []);
+  }, [checkAuthStatus]);
 
   useEffect(() => {
     const sub = AppState.addEventListener("change", (next) => {
@@ -112,31 +137,6 @@ export default function App() {
     });
     return () => sub.remove();
   }, []);
-
-  const checkAuthStatus = async () => {
-    try {
-      const isAuthenticated = await authService.isAuthenticated();
-      if (!isAuthenticated) {
-        setInitialRoute("Login");
-        setLocked(false);
-        return;
-      }
-      const [hasTenant, biometricOn] = await Promise.all([
-        authService.hasSelectedTenant(),
-        isBiometricEnabled(),
-      ]);
-      setInitialRoute(hasTenant ? "Main" : "CompanySelection");
-      setLocked(biometricOn);
-      if (hasTenant) {
-        void rbacService.sync().catch(() => undefined);
-      }
-    } catch {
-      setInitialRoute("Login");
-      setLocked(false);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const fontsReady = fontsLoaded || Boolean(fontError);
   const showSplash = isLoading || !fontsReady;

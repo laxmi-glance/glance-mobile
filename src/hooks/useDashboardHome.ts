@@ -86,6 +86,7 @@ export function useDashboardHome() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fetchGen = useRef(0);
 
   const perms: DashboardPerms = useMemo(() => {
     const role = String(rbac.role || "").toLowerCase();
@@ -121,10 +122,15 @@ export function useDashboardHome() {
     if (rbac.loading) {
       return;
     }
+    fetchGen.current += 1;
+    const gen = fetchGen.current;
     setError(null);
     try {
       const fetchEpoch = getThemeWriteEpoch();
       const storedPeriod = await AsyncStorage.getItem(PERIOD_KEY);
+      if (gen !== fetchGen.current) {
+        return;
+      }
       const activePeriod: DashboardPeriod = isPeriod(storedPeriod) ? storedPeriod : period;
       if (activePeriod !== period) {
         setPeriodState(activePeriod);
@@ -137,6 +143,9 @@ export function useDashboardHome() {
         preferencesService.get().catch(() => ({}) as UserPreferences),
         dashboardService.getComplete().catch(() => null),
       ]);
+      if (gen !== fetchGen.current) {
+        return;
+      }
 
       setProfile(me);
       setCompanyName(company?.name || selected?.company_name || "Workspace");
@@ -325,17 +334,26 @@ export function useDashboardHome() {
       }
 
       await Promise.all(tasks);
+      if (gen !== fetchGen.current) {
+        return;
+      }
       setSecondary({ ...next });
     } catch (err) {
+      if (gen !== fetchGen.current) {
+        return;
+      }
       setError(err instanceof Error ? err.message : "Could not load dashboard");
     } finally {
+      if (gen !== fetchGen.current) {
+        return;
+      }
       setLoading(false);
       setRefreshing(false);
     }
   }, [period, perms, rbac.loading, rbac.role, applyFromPreferences, getThemeWriteEpoch]);
 
   useEffect(() => {
-    void load();
+    void load(); // eslint-disable-line react-hooks/set-state-in-effect -- load dashboard after async API calls
   }, [load]);
 
   const skipNextFocus = useRef(true);

@@ -13,7 +13,7 @@ All commands run from `glance-mobile`. Use pnpm scripts. Expo CLI has no `start:
 
 ## Prerequisites
 
-- Node.js >= 20.19.4
+- Node.js >= 20.19.4 (22.13+ recommended)
 - pnpm
 - Expo Go on the test device, or iOS Simulator / Android Emulator
 - EAS login for cloud builds: `npx eas-cli login`

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { View, Text, ActivityIndicator, ScrollView, Alert } from "react-native";
 import { ApDocumentScreenProps } from "../types/navigation";
 import financialDocumentService from "../services/financialDocument.service";
@@ -33,18 +33,30 @@ export default function ApDocumentScreen({ route, navigation }: ApDocumentScreen
   const [loading, setLoading] = useState(true);
   const [actingOn, setActingOn] = useState<"approved" | "rejected" | null>(null);
   const [rejectOpen, setRejectOpen] = useState(false);
+  const fetchGen = useRef(0);
 
   const loadDocument = useCallback(
     async (goBackOnError = true) => {
+      fetchGen.current += 1;
+      const gen = fetchGen.current;
       try {
         const data = await financialDocumentService.getDocument(documentId);
+        if (gen !== fetchGen.current) {
+          return;
+        }
         setDocument(data);
       } catch (error: unknown) {
+        if (gen !== fetchGen.current) {
+          return;
+        }
         Alert.alert("Could not load document", apiErrorMessage(error));
         if (goBackOnError) {
           navigation.goBack();
         }
       } finally {
+        if (gen !== fetchGen.current) {
+          return;
+        }
         setLoading(false);
       }
     },
@@ -52,7 +64,7 @@ export default function ApDocumentScreen({ route, navigation }: ApDocumentScreen
   );
 
   useEffect(() => {
-    void loadDocument();
+    void loadDocument(); // eslint-disable-line react-hooks/set-state-in-effect -- load document after async API call
   }, [loadDocument]);
 
   const submit = async (status: "approved" | "rejected", remarks?: string) => {

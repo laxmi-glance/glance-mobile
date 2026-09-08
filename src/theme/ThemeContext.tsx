@@ -33,10 +33,6 @@ function systemTheme(): ResolvedTheme {
   return Appearance.getColorScheme() === "dark" ? THEME_DARK : THEME_LIGHT;
 }
 
-function resolveTheme(mode: ThemeMode): ResolvedTheme {
-  return mode === THEME_AUTO ? systemTheme() : mode;
-}
-
 type ThemeContextValue = {
   mode: ThemeMode;
   resolvedTheme: ResolvedTheme;
@@ -54,13 +50,17 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [mode, setMode] = useState<ThemeMode>(THEME_AUTO);
-  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(resolveTheme(THEME_AUTO));
+  const [system, setSystem] = useState<ResolvedTheme>(systemTheme);
   const [localReady, setLocalReady] = useState(false);
   const modeRef = useRef(mode);
-  modeRef.current = mode;
   const writeEpochRef = useRef(0);
   const patchInFlightRef = useRef(false);
   const hydrateInFlightRef = useRef<Promise<void> | null>(null);
+  const resolvedTheme: ResolvedTheme = mode === THEME_AUTO ? system : mode;
+
+  useEffect(() => {
+    modeRef.current = mode;
+  }, [mode]);
 
   const getThemeWriteEpoch = useCallback(() => writeEpochRef.current, []);
 
@@ -74,7 +74,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         return;
       }
       setMode(next);
-      setResolvedTheme(resolveTheme(next));
     },
     []
   );
@@ -115,7 +114,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         patchInFlightRef.current = true;
       }
       setMode(value);
-      setResolvedTheme(resolveTheme(value));
       try {
         await AsyncStorage.setItem(STORAGE_KEY, value);
       } catch {
@@ -144,7 +142,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return onSessionExpired(() => {
       writeEpochRef.current += 1;
       setMode(THEME_AUTO);
-      setResolvedTheme(resolveTheme(THEME_AUTO));
       void AsyncStorage.setItem(STORAGE_KEY, THEME_AUTO).catch(() => undefined);
     });
   }, []);
@@ -156,7 +153,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         const stored = await AsyncStorage.getItem(STORAGE_KEY);
         if (!cancelled && isMode(stored)) {
           setMode(stored);
-          setResolvedTheme(resolveTheme(stored));
         }
       } catch {
         // keep auto
@@ -193,20 +189,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     if (!localReady) {
       return;
     }
-    const next = resolveTheme(mode);
-    setResolvedTheme((prev) => (prev === next ? prev : next));
     void AsyncStorage.setItem(STORAGE_KEY, mode).catch(() => undefined);
   }, [mode, localReady]);
 
   useEffect(() => {
-    if (mode !== THEME_AUTO) {
-      return;
-    }
     const sub = Appearance.addChangeListener(({ colorScheme }) => {
-      setResolvedTheme(colorScheme === "dark" ? THEME_DARK : THEME_LIGHT);
+      setSystem(colorScheme === "dark" ? THEME_DARK : THEME_LIGHT);
     });
     return () => sub.remove();
-  }, [mode]);
+  }, []);
 
   const colors = resolvedTheme === THEME_DARK ? darkColors : lightColors;
   const type = useMemo(() => makeType(colors), [colors]);

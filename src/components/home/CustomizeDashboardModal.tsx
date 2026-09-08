@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Alert, Modal, ScrollView, Switch, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -36,13 +36,6 @@ export default function CustomizeDashboardModal({
   const insets = useSafeAreaInsets();
   const [draftOrder, setDraftOrder] = useState(layoutConfig.order);
   const [draftHidden, setDraftHidden] = useState(() => new Set(layoutConfig.hidden));
-
-  useEffect(() => {
-    if (open) {
-      setDraftOrder(layoutConfig.order);
-      setDraftHidden(new Set(layoutConfig.hidden));
-    }
-  }, [open, layoutConfig]);
 
   const moveItem = (index: number, direction: -1 | 1) => {
     const target = index + direction;

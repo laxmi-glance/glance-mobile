@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { View, Text, ActivityIndicator, ScrollView, Alert } from "react-native";
 import { DocumentDetailScreenProps } from "../types/navigation";
 import documentService from "../services/document.service";
@@ -20,18 +20,30 @@ export default function DocumentDetailScreen({ route, navigation }: DocumentDeta
   const [document, setDocument] = useState<PreprocessingDocument | null>(null);
   const [loading, setLoading] = useState(true);
   const [retrying, setRetrying] = useState(false);
+  const fetchGen = useRef(0);
 
   const loadDocument = useCallback(
     async (goBackOnError = true) => {
+      fetchGen.current += 1;
+      const gen = fetchGen.current;
       try {
         const data = await documentService.getDocumentDetail(documentId);
+        if (gen !== fetchGen.current) {
+          return;
+        }
         setDocument(data);
       } catch (error: unknown) {
+        if (gen !== fetchGen.current) {
+          return;
+        }
         Alert.alert("Could not load document", apiErrorMessage(error));
         if (goBackOnError) {
           navigation.goBack();
         }
       } finally {
+        if (gen !== fetchGen.current) {
+          return;
+        }
         setLoading(false);
       }
     },
@@ -39,7 +51,7 @@ export default function DocumentDetailScreen({ route, navigation }: DocumentDeta
   );
 
   useEffect(() => {
-    void loadDocument();
+    void loadDocument(); // eslint-disable-line react-hooks/set-state-in-effect -- load document after async API call
   }, [loadDocument]);
 
   const handleRetry = () => {

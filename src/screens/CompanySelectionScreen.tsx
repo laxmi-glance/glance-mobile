@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -45,13 +45,19 @@ export default function CompanySelectionScreen({ navigation }: CompanySelectionS
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectingId, setSelectingId] = useState<string | null>(null);
+  const fetchGen = useRef(0);
 
   const loadTenants = useCallback(async (isRefresh = false) => {
+    fetchGen.current += 1;
+    const gen = fetchGen.current;
     try {
       const [stored, current] = await Promise.all([
         authService.getStoredTenants(),
         tenantService.getSelectedTenant(),
       ]);
+      if (gen !== fetchGen.current) {
+        return;
+      }
       if (stored.length && !isRefresh) {
         setTenants(stored);
       }
@@ -59,12 +65,18 @@ export default function CompanySelectionScreen({ navigation }: CompanySelectionS
         setSelectedId(current.tenant_id);
       }
       const data = await tenantService.listTenants();
+      if (gen !== fetchGen.current) {
+        return;
+      }
       setTenants(data);
       const latest = data.find((tenant) => tenant.is_current)?.tenant_id || current?.tenant_id;
       if (latest) {
         setSelectedId(latest);
       }
     } catch (error: unknown) {
+      if (gen !== fetchGen.current) {
+        return;
+      }
       const stored = await authService.getStoredTenants();
       if (stored.length) {
         setTenants(stored);
@@ -72,13 +84,16 @@ export default function CompanySelectionScreen({ navigation }: CompanySelectionS
         Alert.alert("Could not load workspaces", apiErrorMessage(error));
       }
     } finally {
+      if (gen !== fetchGen.current) {
+        return;
+      }
       setLoading(false);
       setRefreshing(false);
     }
   }, []);
 
   useEffect(() => {
-    void loadTenants();
+    void loadTenants(); // eslint-disable-line react-hooks/set-state-in-effect -- load workspaces after async API call
   }, [loadTenants]);
 
   const openWorkspace = () => {

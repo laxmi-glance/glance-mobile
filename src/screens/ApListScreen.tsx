@@ -42,19 +42,32 @@ export default function ApListScreen({ navigation }: ApScreenProps) {
   const [search, setSearch] = useState("");
   const [approvalStatus, setApprovalStatus] = useState<ApprovalStatus | undefined>();
   const searchRef = useRef(search);
-  searchRef.current = search;
+  const fetchGen = useRef(0);
+  const loadingMoreRef = useRef(false);
+
+  useEffect(() => {
+    searchRef.current = search;
+  }, [search]);
 
   const loadDocuments = useCallback(
-    async (pageNum = 1, replace = false) => {
+    async (pageNum = 1, replace = false, query = searchRef.current) => {
+      const isReplace = replace || pageNum === 1;
+      if (isReplace) {
+        fetchGen.current += 1;
+      }
+      const gen = fetchGen.current;
       try {
         const [list, listStats] = await Promise.all([
           financialDocumentService.listApDocuments({
             page: pageNum,
-            search: searchRef.current.trim() || undefined,
+            search: query.trim() || undefined,
             approval_status: approvalStatus,
           }),
           pageNum === 1 ? financialDocumentService.getApStats() : Promise.resolve(null),
         ]);
+        if (gen !== fetchGen.current) {
+          return;
+        }
         setDocuments((prev) => mergeUniqueById(prev, list.results, replace || pageNum === 1));
         setHasMore(Boolean(list.next));
         setPage(pageNum);
@@ -62,8 +75,15 @@ export default function ApListScreen({ navigation }: ApScreenProps) {
           setStats(listStats);
         }
       } catch (error: unknown) {
+        if (gen !== fetchGen.current) {
+          return;
+        }
         Alert.alert("Could not load documents", apiErrorMessage(error));
       } finally {
+        if (gen !== fetchGen.current) {
+          return;
+        }
+        loadingMoreRef.current = false;
         setLoading(false);
         setRefreshing(false);
         setLoadingMore(false);
@@ -76,7 +96,6 @@ export default function ApListScreen({ navigation }: ApScreenProps) {
     if (rbacLoading) {
       return;
     }
-    setLoading(true);
     void loadDocuments(1, true);
   }, [loadDocuments, rbacLoading]);
 
@@ -84,6 +103,15 @@ export default function ApListScreen({ navigation }: ApScreenProps) {
     setRefreshing(true);
     void loadDocuments(1, true);
   }, [loadDocuments]);
+
+  const applyStatus = (next: ApprovalStatus | undefined) => {
+    if (approvalStatus === next) {
+      return;
+    }
+    setPage(1);
+    setLoading(true);
+    setApprovalStatus(next);
+  };
 
   const openItem = (item: FinancialDocumentListItem) => {
     if (isProcessingRow(item)) {
@@ -137,26 +165,26 @@ export default function ApListScreen({ navigation }: ApScreenProps) {
             label="Total"
             value={stats.total}
             active={!approvalStatus}
-            onPress={() => setApprovalStatus(undefined)}
+            onPress={() => applyStatus(undefined)}
           />
           <StatChip
             label="Pending"
             value={stats.pending}
             active={approvalStatus === "pending"}
-            onPress={() => setApprovalStatus("pending")}
+            onPress={() => applyStatus("pending")}
           />
           <StatChip
             label="Approved"
             value={stats.approved}
             active={approvalStatus === "approved"}
-            onPress={() => setApprovalStatus("approved")}
+            onPress={() => applyStatus("approved")}
           />
           <StatChip
             label="Rejected"
             value={stats.rejected}
             accent={stats.rejected > 0}
             active={approvalStatus === "rejected"}
-            onPress={() => setApprovalStatus("rejected")}
+            onPress={() => applyStatus("rejected")}
           />
         </View>
       ) : null}
@@ -171,8 +199,10 @@ export default function ApListScreen({ navigation }: ApScreenProps) {
           onChangeText={setSearch}
           returnKeyType="search"
           onSubmitEditing={() => {
+            searchRef.current = search;
+            setPage(1);
             setLoading(true);
-            void loadDocuments(1, true);
+            void loadDocuments(1, true, search);
           }}
         />
       </View>
@@ -184,10 +214,12 @@ export default function ApListScreen({ navigation }: ApScreenProps) {
         contentContainerStyle={styles.list}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         onEndReached={() => {
-          if (!loading && !loadingMore && hasMore) {
-            setLoadingMore(true);
-            void loadDocuments(page + 1);
+          if (loading || loadingMoreRef.current || refreshing || !hasMore) {
+            return;
           }
+          loadingMoreRef.current = true;
+          setLoadingMore(true);
+          void loadDocuments(page + 1);
         }}
         onEndReachedThreshold={0.4}
         ListFooterComponent={loadingMore ? <ActivityIndicator style={styles.loadingMore} /> : null}
@@ -202,7 +234,7 @@ export default function ApListScreen({ navigation }: ApScreenProps) {
         }
       />
 
-      {(loading && page === 1) || rbacLoading ? (
+      {loading || rbacLoading ? (
         <View style={styles.overlay}>
           <ActivityIndicator size="large" color={colors.brand} />
         </View>
@@ -307,7 +339,7 @@ function createStyles({ colors, type }: ThemeTokens) {
       paddingBottom: space.xxxl,
     },
     overlay: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
       backgroundColor: colors.overlay,
       justifyContent: "center",
       alignItems: "center",

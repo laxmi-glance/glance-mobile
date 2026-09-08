@@ -6,12 +6,6 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#13003E"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.glancewise.mobile",
@@ -34,7 +28,6 @@
         "android.permission.ACCESS_NETWORK_STATE",
         "android.permission.CAMERA"
       ],
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
@@ -62,6 +55,15 @@
         "expo-local-authentication",
         {
           "faceIDPermission": "Glancewise uses Face ID to unlock the app after you sign in."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#13003E",
+          "image": "./assets/splash-icon.png",
+          "resizeMode": "contain",
+          "enableFullScreenImage_legacy": true
         }
       ]
     ],

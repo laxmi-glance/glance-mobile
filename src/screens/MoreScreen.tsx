@@ -63,7 +63,7 @@ export default function MoreScreen({ navigation }: MoreScreenProps) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [loading, setLoading] = useState(true);
-  const [photoFailed, setPhotoFailed] = useState(false);
+  const [photoFailedUri, setPhotoFailedUri] = useState<string | null>(null);
   const [biometricOn, setBiometricOn] = useState(false);
   const [biometric, setBiometric] = useState<BiometricCapability | null>(null);
 
@@ -91,10 +91,6 @@ export default function MoreScreen({ navigation }: MoreScreenProps) {
       }
     })();
   }, []);
-
-  useEffect(() => {
-    setPhotoFailed(false);
-  }, [profile?.profile_pic_url, profile?.profile_pic]);
 
   useFocusEffect(
     useCallback(() => {
@@ -168,7 +164,7 @@ export default function MoreScreen({ navigation }: MoreScreenProps) {
   const roleLabel = formatRole(profile?.role || tenant?.role);
   // `profile_pic` is the short-lived signed URL; `profile_pic_url` is the private S3 key.
   const photoUri = profile?.profile_pic || null;
-  const showPhoto = Boolean(photoUri) && !photoFailed;
+  const showPhoto = Boolean(photoUri) && photoFailedUri !== photoUri;
   const initial = displayName.trim().charAt(0).toUpperCase() || "G";
 
   return (
@@ -193,7 +189,7 @@ export default function MoreScreen({ navigation }: MoreScreenProps) {
                   style={styles.avatarPhoto}
                   resizeMode="cover"
                   accessibilityLabel="Profile photo"
-                  onError={() => setPhotoFailed(true)}
+                  onError={() => setPhotoFailedUri(photoUri)}
                 />
               ) : (
                 <View style={styles.avatarFallback}>

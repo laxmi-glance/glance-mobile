@@ -35,19 +35,32 @@ export default function ProcessingQueueScreen({ navigation }: QueueScreenProps) 
   const [search, setSearch] = useState("");
   const [summaryStatus, setSummaryStatus] = useState<QueueSummaryStatus | undefined>();
   const searchRef = useRef(search);
-  searchRef.current = search;
+  const fetchGen = useRef(0);
+  const loadingMoreRef = useRef(false);
+
+  useEffect(() => {
+    searchRef.current = search;
+  }, [search]);
 
   const loadDocuments = useCallback(
-    async (pageNum = 1, replace = false) => {
+    async (pageNum = 1, replace = false, query = searchRef.current) => {
+      const isReplace = replace || pageNum === 1;
+      if (isReplace) {
+        fetchGen.current += 1;
+      }
+      const gen = fetchGen.current;
       try {
         const [queue, queueStats] = await Promise.all([
           documentService.getProcessingQueue({
             page: pageNum,
-            search: searchRef.current.trim() || undefined,
+            search: query.trim() || undefined,
             summary_status: summaryStatus,
           }),
           pageNum === 1 ? documentService.getQueueStats() : Promise.resolve(null),
         ]);
+        if (gen !== fetchGen.current) {
+          return;
+        }
 
         setDocuments((prev) => mergeUniqueById(prev, queue.results, replace || pageNum === 1));
         setHasMore(Boolean(queue.next));
@@ -56,8 +69,15 @@ export default function ProcessingQueueScreen({ navigation }: QueueScreenProps) 
           setStats(queueStats);
         }
       } catch (error: unknown) {
+        if (gen !== fetchGen.current) {
+          return;
+        }
         Alert.alert("Could not load queue", apiErrorMessage(error));
       } finally {
+        if (gen !== fetchGen.current) {
+          return;
+        }
+        loadingMoreRef.current = false;
         setLoading(false);
         setRefreshing(false);
         setLoadingMore(false);
@@ -67,7 +87,6 @@ export default function ProcessingQueueScreen({ navigation }: QueueScreenProps) 
   );
 
   useEffect(() => {
-    setLoading(true);
     void loadDocuments(1, true);
   }, [loadDocuments]);
 
@@ -77,16 +96,28 @@ export default function ProcessingQueueScreen({ navigation }: QueueScreenProps) 
   }, [loadDocuments]);
 
   const loadMore = () => {
-    if (loading || loadingMore || refreshing || !hasMore) {
+    if (loading || loadingMoreRef.current || refreshing || !hasMore) {
       return;
     }
+    loadingMoreRef.current = true;
     setLoadingMore(true);
-    loadDocuments(page + 1);
+    void loadDocuments(page + 1);
   };
 
   const handleSearch = () => {
+    searchRef.current = search;
+    setPage(1);
     setLoading(true);
-    loadDocuments(1, true);
+    void loadDocuments(1, true, search);
+  };
+
+  const applyStatus = (next: QueueSummaryStatus | undefined) => {
+    if (summaryStatus === next) {
+      return;
+    }
+    setPage(1);
+    setLoading(true);
+    setSummaryStatus(next);
   };
 
   return (
@@ -115,26 +146,26 @@ export default function ProcessingQueueScreen({ navigation }: QueueScreenProps) 
             label="Total"
             value={stats.total}
             active={!summaryStatus}
-            onPress={() => setSummaryStatus(undefined)}
+            onPress={() => applyStatus(undefined)}
           />
           <StatChip
             label="In progress"
             value={stats.processing}
             active={summaryStatus === "processing"}
-            onPress={() => setSummaryStatus("processing")}
+            onPress={() => applyStatus("processing")}
           />
           <StatChip
             label="Done"
             value={stats.completed}
             active={summaryStatus === "completed"}
-            onPress={() => setSummaryStatus("completed")}
+            onPress={() => applyStatus("completed")}
           />
           <StatChip
             label="Issues"
             value={stats.failed}
             accent={stats.failed > 0}
             active={summaryStatus === "failed"}
-            onPress={() => setSummaryStatus("failed")}
+            onPress={() => applyStatus("failed")}
           />
         </View>
       ) : null}
@@ -176,7 +207,7 @@ export default function ProcessingQueueScreen({ navigation }: QueueScreenProps) 
         }
       />
 
-      {loading && page === 1 ? (
+      {loading ? (
         <View style={styles.overlay}>
           <ActivityIndicator size="large" color={colors.brand} />
         </View>
@@ -283,7 +314,7 @@ function createStyles({ colors, type }: ThemeTokens) {
       paddingBottom: space.xxxl,
     },
     overlay: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
       backgroundColor: colors.overlay,
       justifyContent: "center",
       alignItems: "center",

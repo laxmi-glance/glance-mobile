@@ -117,7 +117,7 @@ export default function BiometricLock({ onUnlock, onSignInElsewhere }: Props) {
 
 const styles = StyleSheet.create({
   root: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     zIndex: 50,
     elevation: Platform.OS === "android" ? 50 : 0,
     backgroundColor: colors.brandNavy,

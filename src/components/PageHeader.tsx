@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   Image,
   Modal,
@@ -57,15 +57,11 @@ export default function PageHeader({
   const styles = useThemedStyles(createStyles);
   const insets = useSafeAreaInsets();
   const menuBtnRef = useRef<View>(null);
-  const [logoFailed, setLogoFailed] = useState(false);
+  const [failedLogoUri, setFailedLogoUri] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuTop, setMenuTop] = useState(0);
 
-  useEffect(() => {
-    setLogoFailed(false);
-  }, [iconUri]);
-
-  const showLogo = Boolean(iconUri) && !logoFailed;
+  const showLogo = Boolean(iconUri) && failedLogoUri !== iconUri;
   const badgeLabel =
     supportingBadge && supportingBadge > 0
       ? supportingBadge > 99
@@ -108,7 +104,7 @@ export default function PageHeader({
             style={styles.logo}
             resizeMode="contain"
             accessibilityLabel="Page icon"
-            onError={() => setLogoFailed(true)}
+            onError={() => setFailedLogoUri(iconUri ?? null)}
           />
         ) : icon ? (
           <Ionicons name={icon} size={22} color={colors.brand} />

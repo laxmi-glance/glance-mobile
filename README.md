@@ -29,14 +29,14 @@ It is **not** a full replacement for the web product (no GL, reports, banking, b
 
 ## Tech stack
 
-- Expo SDK 54 / React Native 0.81
+- Expo SDK 57 / React Native 0.86
 - TypeScript
 - React Navigation
 - Axios + AsyncStorage
 
 ## Prerequisites
 
-- Node.js >= 20.19.4
+- Node.js >= 20.19.4 (22.13+ recommended)
 - pnpm
 - Expo Go (device testing) or iOS Simulator / Android Emulator
 - A Glancewise backend (`dev` / staging) with `DISABLE_RECAPTCHA=true` until native reCAPTCHA is added
