@@ -2,15 +2,18 @@
  * Native cleartext HTTP is only enabled when talking to a local API.
  * Staging and production builds use HTTPS.
  *
- * Product version: package.json "version" is the single source of truth.
+ * Product version: env-versions.json for the active API environment.
+ * package.json "version" is package identity and a fallback only.
  */
-const pkg = require("./package.json");
+const { ENV_NAMES, resolveAppVersion } = require("./scripts/version-tools");
 
 module.exports = ({ config }) => {
   const apiEnv = String(
     process.env.EXPO_PUBLIC_API_ENV || config.extra?.apiEnv || ""
   ).toLowerCase();
-  const allowLocalHttp = apiEnv === "local";
+  const knownEnv = ENV_NAMES.includes(apiEnv) ? apiEnv : null;
+  const allowLocalHttp = knownEnv === "local";
+  const version = resolveAppVersion(knownEnv || "local");
 
   const plugins = (config.plugins || []).filter((plugin) => {
     const name = Array.isArray(plugin) ? plugin[0] : plugin;
@@ -28,8 +31,13 @@ module.exports = ({ config }) => {
 
   return {
     ...config,
-    version: pkg.version,
+    version,
     plugins,
+    extra: {
+      ...config.extra,
+      ...(knownEnv ? { apiEnv: knownEnv } : {}),
+      appVersion: version,
+    },
     android: {
       ...config.android,
       allowBackup: false,

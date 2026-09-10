@@ -102,7 +102,7 @@ Staging login may require `DISABLE_RECAPTCHA=true` on the backend until native r
 
 ## Store builds (EAS)
 
-See [HELP.md](./HELP.md) for EAS profiles, tunnel QA, and troubleshooting.
+Per-environment versions live in `env-versions.json`. `pnpm build:staging` (and other `build:*` scripts) prompt to patch-bump that environment. See [HELP.md](./HELP.md) for EAS profiles, versioning, tunnel QA, and troubleshooting.
 
 ## Project structure
 
@@ -121,5 +121,6 @@ src/
 
 | Date | Version | Author | Summary |
 |------|---------|--------|---------|
+| 2026-09-10 | 2.1 | Engineering | Per-env versions via env-versions.json and build bump prompt |
 | 2026-09-02 | 2.0 | Engineering | Merged GETTING_STARTED; aligned API URLs with env.ts |
 | 2026-06-01 | 1.0 | Engineering | Initial README |

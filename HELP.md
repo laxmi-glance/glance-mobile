@@ -3,9 +3,9 @@
 | Field | Value |
 |-------|-------|
 | **Document ID** | MO-DOC-011 |
-| **Version** | 2.0 |
+| **Version** | 2.1 |
 | **Owner** | Engineering |
-| **Last updated** | 2026-09-02 |
+| **Last updated** | 2026-09-10 |
 | **Classification** | Internal |
 | **Audience** | Mobile developers, QA, release engineering |
 
@@ -82,6 +82,36 @@ Send the QR code or `exp://` link. Keep Metro running while they test.
 
 ---
 
+## Versioning
+
+User-facing versions are per environment in `env-versions.json`. `package.json` `version` is package identity only. Android `versionCode` / iOS `buildNumber` still auto-increment on EAS (remote).
+
+```bash
+pnpm version:get              # all environments
+pnpm version:get:staging
+pnpm version:set 1.2.0 -- --env=staging
+pnpm version:bump:staging     # or: pnpm version:bump -- --env=staging
+```
+
+`pnpm build:staging`, `pnpm build:production`, and the platform-specific `build:*` scripts (except `*:no-bump`) prompt before packaging:
+
+```
+Current staging version is 1.0.0. Do you want to bump it? [y/N]
+```
+
+Answer `y` / `yes` to patch-bump **that environment only**. Anything else keeps the current env version. Commit `env-versions.json` when a bump is accepted. `version:set` and `version:bump` require `--env`.
+
+| Override | Effect |
+|---|---|
+| `SKIP_VERSION_BUMP=1 pnpm build:staging` | No prompt; keep current env version |
+| `pnpm build:staging:no-bump` | Same as skip |
+| `MOBILE_VERSION=1.2.0 pnpm build:staging` | Skip bump prompt; writes `1.2.0` into that env in `env-versions.json` so the EAS worker matches |
+| CI (`CI` / `GITHUB_ACTIONS` / …) | No prompt; keep current env version |
+
+Do not call `npx eas-cli build` directly if you want the bump prompt — use the `pnpm build:*` scripts.
+
+---
+
 ## Build (installable binaries)
 
 Log in once:
@@ -99,13 +129,9 @@ Builds: https://expo.dev/accounts/glancewise-01/projects/glancewise-mobile/build
 Uses EAS profile `preview` (`EXPO_PUBLIC_API_ENV=staging`). Produces an internal APK.
 
 ```bash
+pnpm build:staging
+# or
 pnpm build:android:preview
-```
-
-Equivalent:
-
-```bash
-npx eas-cli build --platform android --profile preview
 ```
 
 Share the install link from the Expo build page when it finishes (~15–30 min).
@@ -117,12 +143,6 @@ Needs a paid Apple Developer account, signing certificates, and registered devic
 ```bash
 npx eas-cli device:create
 pnpm build:ios:preview
-```
-
-Equivalent:
-
-```bash
-npx eas-cli build --platform ios --profile preview
 ```
 
 `device:create` prints a URL each tester must open **on their iPhone** so the UDID is registered. Then rebuild so the provisioning profile includes those devices.
@@ -144,19 +164,12 @@ pnpm build:android:production   # Play Store AAB
 pnpm build:ios:production       # App Store / TestFlight (Apple Developer required)
 ```
 
-Equivalent:
-
-```bash
-npx eas-cli build --platform android --profile production
-npx eas-cli build --platform ios --profile production
-```
-
 ### Useful EAS commands
 
 ```bash
 npx eas-cli build:list
 npx eas-cli build:view
-npx eas-cli build --platform android --profile preview --non-interactive --no-wait
+pnpm build:staging -- --no-wait
 ```
 
 ---
@@ -168,6 +181,7 @@ pnpm lint
 pnpm lint:fix
 pnpm format
 pnpm format:check
+pnpm test:version-tools
 ```
 
 ---

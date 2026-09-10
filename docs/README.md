@@ -18,7 +18,7 @@ Index for controlled mobile app documentation.
 | ID | Document | Purpose |
 |----|----------|---------|
 | MO-DOC-010 | [../README.md](../README.md) | Product overview, auth contract, quick start |
-| MO-DOC-011 | [../HELP.md](../HELP.md) | Run, EAS build, tunnel, troubleshooting |
+| MO-DOC-011 | [../HELP.md](../HELP.md) | Run, EAS build, per-env versioning, tunnel, troubleshooting |
 
 ## Archive
 
