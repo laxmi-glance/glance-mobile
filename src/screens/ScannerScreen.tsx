@@ -2,8 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Animated,
-  Easing,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -17,7 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ScannerScreenProps } from "../types/navigation";
 import { useDocumentUpload } from "../hooks/useDocumentUpload";
 import { pickDocuments, pickFromLibrary } from "../utils/pickUpload";
-import { colors, type } from "../theme";
+import { colors, fonts, type } from "../theme";
 
 const CORNER = {
   tl: "#EA4335",
@@ -25,8 +24,42 @@ const CORNER = {
   bl: "#4285F4",
   br: "#34A853",
 };
-const MASK = "rgba(0,0,0,0.58)";
-const SCAN_LINE = "#D4AF37";
+const MASK = "rgba(0,0,0,0.5)";
+const HEADER_CONTENT = 56;
+const DOCK_CONTENT = 142;
+
+type PaperSizeId = "a4" | "letter" | "legal" | "a5" | "receipt" | "free";
+
+const PAPER_SIZES: { id: PaperSizeId; label: string; mm?: { w: number; h: number } }[] = [
+  { id: "a4", label: "A4", mm: { w: 210, h: 297 } },
+  { id: "letter", label: "Letter", mm: { w: 215.9, h: 279.4 } },
+  { id: "legal", label: "Legal", mm: { w: 215.9, h: 355.6 } },
+  { id: "a5", label: "A5", mm: { w: 148, h: 210 } },
+  { id: "receipt", label: "Receipt", mm: { w: 80, h: 200 } },
+  { id: "free", label: "Free" },
+];
+
+function frameForPaper(
+  paperId: PaperSizeId,
+  maxW: number,
+  maxH: number
+): { frameW: number; frameH: number } {
+  const width = Math.max(maxW, 120);
+  const height = Math.max(maxH, 160);
+  const paper = PAPER_SIZES.find((item) => item.id === paperId);
+  if (!paper?.mm) {
+    return { frameW: width, frameH: height };
+  }
+
+  const aspect = paper.mm.h / paper.mm.w;
+  let frameW = width;
+  let frameH = frameW * aspect;
+  if (frameH > height) {
+    frameH = height;
+    frameW = frameH / aspect;
+  }
+  return { frameW, frameH };
+}
 
 export default function ScannerScreen({ navigation }: ScannerScreenProps) {
   const insets = useSafeAreaInsets();
@@ -35,6 +68,7 @@ export default function ScannerScreen({ navigation }: ScannerScreenProps) {
   const [permission, requestPermission] = useCameraPermissions();
   const [torch, setTorch] = useState(false);
   const [capturing, setCapturing] = useState(false);
+  const [paperSize, setPaperSize] = useState<PaperSizeId>("a4");
 
   const { uploading, uploadFiles, canUpload, rbacLoading } = useDocumentUpload(() => {
     navigation.replace("Queue");
@@ -47,32 +81,20 @@ export default function ScannerScreen({ navigation }: ScannerScreenProps) {
   }, [canUpload, rbacLoading, requestPermission]);
 
   const layout = useMemo(() => {
-    const headerH = insets.top + 52;
-    const sheetH = 100 + Math.max(insets.bottom, 12);
-    const shutterH = 72;
-    const gapAfterFrame = 18;
-    const controlsH = gapAfterFrame + shutterH + 16;
-    const availableH = height - headerH - sheetH - controlsH;
-    const a4 = 297 / 210;
-    let frameW = Math.min(width * 0.78, 340);
-    let frameH = frameW * a4;
-    if (frameH > availableH) {
-      frameH = Math.max(availableH, 260);
-      frameW = frameH / a4;
-    }
-    const frameLeft = (width - frameW) / 2;
-    const frameTop = headerH + Math.max(8, (availableH - frameH) / 2);
-    const shutterTop = frameTop + frameH + gapAfterFrame;
+    const headerH = insets.top + HEADER_CONTENT;
+    const dockH = DOCK_CONTENT + Math.max(insets.bottom, 12);
+    const availableH = height - headerH - dockH;
+    const { frameW, frameH } = frameForPaper(paperSize, width, availableH);
     return {
       frameW,
       frameH,
-      frameLeft,
-      frameTop,
-      shutterTop,
+      frameLeft: (width - frameW) / 2,
+      frameTop: headerH + (availableH - frameH) / 2,
     };
-  }, [height, insets.bottom, insets.top, width]);
+  }, [height, insets.bottom, insets.top, paperSize, width]);
 
   const busy = capturing || uploading || rbacLoading;
+  const canCapture = Boolean(permission?.granted && canUpload && !busy);
 
   const handleFiles = async (
     picker: () => Promise<Awaited<ReturnType<typeof pickFromLibrary>>>
@@ -91,7 +113,7 @@ export default function ScannerScreen({ navigation }: ScannerScreenProps) {
   };
 
   const takePhoto = async () => {
-    if (busy || !permission?.granted || !canUpload) {
+    if (!canCapture) {
       return;
     }
     setCapturing(true);
@@ -180,57 +202,86 @@ export default function ScannerScreen({ navigation }: ScannerScreenProps) {
           height: layout.frameH,
         }}
       >
-        <ScanLine height={layout.frameH} />
         <Corner color={CORNER.tl} style={styles.tl} />
         <Corner color={CORNER.tr} style={styles.tr} />
         <Corner color={CORNER.bl} style={styles.bl} />
         <Corner color={CORNER.br} style={styles.br} />
       </View>
 
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <IconButton name="close" onPress={() => navigation.goBack()} />
-        <View style={styles.headerRight}>
-          <IconButton
-            name={torch ? "flashlight" : "flashlight-outline"}
-            onPress={() => setTorch((value) => !value)}
-            active={torch}
-            accessibilityLabel="Toggle flashlight"
-          />
-          <IconButton
-            name="image-outline"
-            onPress={() => {
-              void handleFiles(pickFromLibrary);
-            }}
-            accessibilityLabel="Upload from gallery"
-          />
-          <IconButton
-            name="document-outline"
-            onPress={() => {
-              void handleFiles(pickDocuments);
-            }}
-            accessibilityLabel="Upload from files"
-          />
+      <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
+        <View style={styles.headerSide}>
+          <IconButton name="close" onPress={() => navigation.goBack()} accessibilityLabel="Close" />
         </View>
+        <Text style={styles.headerTitle}>Scan document</Text>
+        <View style={styles.headerSide} />
       </View>
 
-      <View style={[styles.shutterWrap, { top: layout.shutterTop }]}>
-        <TouchableOpacity
-          style={styles.shutterOuter}
-          onPress={() => {
-            void takePhoto();
-          }}
-          disabled={busy || !permission?.granted || !canUpload}
-          activeOpacity={0.85}
-          accessibilityLabel="Capture document"
+      <View style={[styles.dock, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.sizeRow}
         >
-          <View style={styles.shutterInner} />
-        </TouchableOpacity>
-      </View>
+          {PAPER_SIZES.map((size) => {
+            const selected = paperSize === size.id;
+            return (
+              <TouchableOpacity
+                key={size.id}
+                onPress={() => setPaperSize(size.id)}
+                style={[styles.sizeChip, selected && styles.sizeChipOn]}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                accessibilityLabel={`${size.label} frame`}
+              >
+                <Text style={[styles.sizeChipLabel, selected && styles.sizeChipLabelOn]}>
+                  {size.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
 
-      <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-        <View style={styles.grabber} />
-        <Text style={styles.sheetTitle}>Scan an invoice or receipt</Text>
-        <Text style={styles.sheetMeta}>Camera • Photos • PDF</Text>
+        <View style={styles.shutterRow}>
+          <View style={styles.shutterSlot}>
+            <IconButton
+              name={torch ? "flash" : "flash-outline"}
+              onPress={() => setTorch((value) => !value)}
+              active={torch}
+              accessibilityLabel="Toggle flashlight"
+            />
+          </View>
+          <TouchableOpacity
+            style={[styles.shutterOuter, !canCapture && styles.shutterDisabled]}
+            onPress={() => {
+              void takePhoto();
+            }}
+            disabled={!canCapture}
+            activeOpacity={0.85}
+            accessibilityLabel="Capture document"
+          >
+            <View style={styles.shutterRing}>
+              <View style={styles.shutterInner} />
+            </View>
+          </TouchableOpacity>
+          <View style={[styles.shutterSlot, styles.shutterSlotEnd]}>
+            <View style={styles.rightActions}>
+              <SideAction
+                icon="images-outline"
+                label="Photos"
+                onPress={() => {
+                  void handleFiles(pickFromLibrary);
+                }}
+              />
+              <SideAction
+                icon="document-text-outline"
+                label="Files"
+                onPress={() => {
+                  void handleFiles(pickDocuments);
+                }}
+              />
+            </View>
+          </View>
+        </View>
       </View>
 
       {!rbacLoading && !canUpload ? (
@@ -280,55 +331,36 @@ function IconButton({
   return (
     <TouchableOpacity
       onPress={onPress}
-      hitSlop={10}
+      hitSlop={8}
       style={[styles.iconBtn, active && styles.iconBtnActive]}
       accessibilityLabel={accessibilityLabel}
     >
-      <Ionicons name={name} size={22} color={colors.white} />
+      <Ionicons name={name} size={20} color={colors.white} />
+    </TouchableOpacity>
+  );
+}
+
+function SideAction({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: React.ComponentProps<typeof Ionicons>["name"];
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity style={styles.sideAction} onPress={onPress} accessibilityLabel={label}>
+      <View style={styles.sideActionIcon}>
+        <Ionicons name={icon} size={22} color={colors.white} />
+      </View>
+      <Text style={styles.sideActionLabel}>{label}</Text>
     </TouchableOpacity>
   );
 }
 
 function Corner({ color, style }: { color: string; style: object }) {
   return <View style={[styles.corner, { borderColor: color }, style]} />;
-}
-
-function ScanLine({ height }: { height: number }) {
-  const [progress] = useState(() => new Animated.Value(0));
-
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(progress, {
-          toValue: 1,
-          duration: 1800,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(progress, {
-          toValue: 0,
-          duration: 1800,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [progress]);
-
-  const travel = Math.max(height - 24, 80);
-  const translateY = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [12, travel],
-  });
-
-  return (
-    <Animated.View
-      pointerEvents="none"
-      style={[styles.scanLine, { transform: [{ translateY }] }]}
-    />
-  );
 }
 
 const styles = StyleSheet.create({
@@ -348,15 +380,22 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
+    minHeight: 44,
     paddingHorizontal: 16,
+    paddingBottom: 8,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     zIndex: 2,
   },
-  headerRight: {
-    flexDirection: "row",
-    gap: 8,
+  headerSide: {
+    flex: 1,
+    alignItems: "flex-start",
+  },
+  headerTitle: {
+    color: colors.white,
+    fontFamily: fonts.semibold,
+    fontSize: 17,
+    letterSpacing: 0.2,
   },
   iconBtn: {
     width: 40,
@@ -364,103 +403,137 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.12)",
   },
   iconBtnActive: {
-    backgroundColor: "rgba(255,255,255,0.22)",
+    backgroundColor: "rgba(255,255,255,0.24)",
   },
   corner: {
     position: "absolute",
-    width: 34,
-    height: 34,
-    borderWidth: 5,
-    borderRadius: 14,
+    width: 28,
+    height: 28,
+    borderWidth: 3.5,
+    borderRadius: 4,
   },
   tl: {
-    top: -2,
-    left: -2,
+    top: 0,
+    left: 0,
     borderRightWidth: 0,
     borderBottomWidth: 0,
   },
   tr: {
-    top: -2,
-    right: -2,
+    top: 0,
+    right: 0,
     borderLeftWidth: 0,
     borderBottomWidth: 0,
   },
   bl: {
-    bottom: -2,
-    left: -2,
+    bottom: 0,
+    left: 0,
     borderRightWidth: 0,
     borderTopWidth: 0,
   },
   br: {
-    bottom: -2,
-    right: -2,
+    bottom: 0,
+    right: 0,
     borderLeftWidth: 0,
     borderTopWidth: 0,
   },
-  scanLine: {
-    position: "absolute",
-    left: 10,
-    right: 10,
-    height: 2,
-    borderRadius: 1,
-    backgroundColor: SCAN_LINE,
-    shadowColor: SCAN_LINE,
-    shadowOpacity: 0.9,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 0 },
-  },
-  shutterWrap: {
+  dock: {
     position: "absolute",
     left: 0,
     right: 0,
-    alignItems: "center",
+    bottom: 0,
     zIndex: 2,
+    paddingTop: 12,
+  },
+  sizeRow: {
+    paddingHorizontal: 20,
+    gap: 8,
+    alignItems: "center",
+  },
+  sizeChip: {
+    height: 32,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  sizeChipOn: {
+    backgroundColor: colors.white,
+  },
+  sizeChipLabel: {
+    fontFamily: fonts.medium,
+    fontSize: 13,
+    lineHeight: 16,
+    color: "rgba(255,255,255,0.92)",
+  },
+  sizeChipLabelOn: {
+    color: "#111111",
+    fontFamily: fonts.semibold,
+  },
+  shutterRow: {
+    marginTop: 18,
+    paddingHorizontal: 20,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  shutterSlot: {
+    flex: 1,
+    alignItems: "center",
+  },
+  shutterSlotEnd: {
+    alignItems: "flex-end",
+  },
+  rightActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  sideAction: {
+    width: 52,
+    alignItems: "center",
+    gap: 6,
+  },
+  sideActionIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sideActionLabel: {
+    fontFamily: fonts.medium,
+    fontSize: 11,
+    lineHeight: 13,
+    color: "rgba(255,255,255,0.72)",
   },
   shutterOuter: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    borderWidth: 4,
+    width: 80,
+    height: 80,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  shutterDisabled: {
+    opacity: 0.45,
+  },
+  shutterRing: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    borderWidth: 3,
     borderColor: colors.white,
     alignItems: "center",
     justifyContent: "center",
   },
   shutterInner: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 62,
+    height: 62,
+    borderRadius: 31,
     backgroundColor: colors.white,
-  },
-  sheet: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "#1C1C1E",
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    paddingTop: 10,
-    paddingHorizontal: 24,
-    alignItems: "center",
-    zIndex: 2,
-  },
-  grabber: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: "rgba(255,255,255,0.35)",
-    marginBottom: 14,
-  },
-  sheetTitle: {
-    ...type.subtitle,
-    color: colors.white,
-  },
-  sheetMeta: {
-    ...type.meta,
-    marginTop: 6,
-    color: colors.textOnDarkMuted,
   },
   permission: {
     position: "absolute",

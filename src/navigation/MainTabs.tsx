@@ -70,7 +70,7 @@ function ScanTabButton() {
     >
       <View style={[styles.scanHalo, { backgroundColor: colors.background }]}>
         <View style={[styles.scanBtn, { backgroundColor: colors.white }]}>
-          <ScanIcon size={30} backgroundColor={colors.white} />
+          <ScanIcon size={30} />
         </View>
       </View>
     </TouchableOpacity>
