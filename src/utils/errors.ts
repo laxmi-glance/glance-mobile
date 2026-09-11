@@ -23,8 +23,13 @@ export function apiErrorMessage(
         }
       }
     }
-    if (error.message === "Network Error") {
-      return "Unable to reach Glancewise. Check your connection and API URL.";
+    if (
+      error.code === "ERR_INVALID_URL" ||
+      error.code === "ERR_NETWORK" ||
+      error.message === "Invalid URL" ||
+      error.message === "Network Error"
+    ) {
+      return "Unable to reach Glancewise. Check your connection.";
     }
   }
   if (error instanceof Error && error.message) {

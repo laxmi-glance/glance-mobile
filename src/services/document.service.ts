@@ -14,6 +14,20 @@ export interface LocalUploadFile {
   mimeType?: string | null;
 }
 
+function toNativeFileUri(uri: string): string {
+  const trimmed = uri.trim();
+  if (!trimmed) {
+    return trimmed;
+  }
+  if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) {
+    return trimmed;
+  }
+  if (trimmed.startsWith("/")) {
+    return `file://${trimmed}`;
+  }
+  return trimmed;
+}
+
 class DocumentService {
   async getProcessingQueue(
     params?: QueueListParams
@@ -57,7 +71,7 @@ class DocumentService {
     const form = new FormData();
     files.forEach((file) => {
       form.append("documents", {
-        uri: file.uri,
+        uri: toNativeFileUri(file.uri),
         name: file.name,
         type: file.mimeType || "application/octet-stream",
       } as unknown as Blob);
@@ -66,7 +80,10 @@ class DocumentService {
     const { data } = await apiClient.post<UploadResult>(
       "/financial-document/upload-financial-documents/",
       form,
-      { timeout: UPLOAD_TIMEOUT_MS }
+      {
+        timeout: UPLOAD_TIMEOUT_MS,
+        transformRequest: [(body) => body],
+      }
     );
     return data;
   }

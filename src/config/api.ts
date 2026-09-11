@@ -1,4 +1,4 @@
-import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
+import axios, { AxiosError, AxiosHeaders, InternalAxiosRequestConfig } from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_BASE_URL, API_TIMEOUT_MS } from "./env";
 import {
@@ -10,6 +10,16 @@ import {
 } from "../core/storage";
 import { notifySessionExpired } from "../core/sessionEvents";
 import type { TokenPair } from "../types/models";
+
+function isFormDataBody(data: unknown): boolean {
+  if (typeof FormData === "undefined" || data == null || typeof data !== "object") {
+    return false;
+  }
+  if (data instanceof FormData) {
+    return true;
+  }
+  return typeof (data as FormData).append === "function";
+}
 
 const PUBLIC_PATHS = [
   "/users/login/",
@@ -27,7 +37,6 @@ export const apiClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: API_TIMEOUT_MS,
   headers: {
-    "Content-Type": "application/json",
     Accept: "application/json",
   },
 });
@@ -40,22 +49,28 @@ function isPublicPath(url?: string): boolean {
 }
 
 apiClient.interceptors.request.use(async (config) => {
+  const headers = AxiosHeaders.from(config.headers);
   const publicPath = isPublicPath(config.url);
   const token = await getAccessToken();
   if (token && !publicPath) {
-    config.headers.Authorization = `Bearer ${token}`;
+    headers.set("Authorization", `Bearer ${token}`);
   }
 
   const tenantId = await AsyncStorage.getItem(StorageKeys.tenantId);
   if (tenantId && !publicPath) {
-    config.headers["X-Tenant-ID"] = tenantId;
+    headers.set("X-Tenant-ID", tenantId);
   }
 
-  // Let RN set the multipart boundary for file uploads.
-  if (typeof FormData !== "undefined" && config.data instanceof FormData) {
-    delete config.headers["Content-Type"];
+  if (isFormDataBody(config.data)) {
+    // Axios POST defaults to urlencoded. If that header reaches RN Android,
+    // OkHttp throws before the request is sent (often shown as an invalid URL /
+    // network error). `false` blocks the default and lets RN set multipart.
+    headers.set("Content-Type", false);
+  } else if (!headers.get("Content-Type")) {
+    headers.set("Content-Type", "application/json");
   }
 
+  config.headers = headers;
   return config;
 });
 
