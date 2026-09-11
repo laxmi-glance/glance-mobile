@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -8,251 +8,319 @@ import {
   RefreshControl,
   TouchableOpacity,
   Alert,
-} from 'react-native';
-import { ProcessingQueueScreenProps } from '../types/navigation';
-import documentService, { Document } from '../services/document.service';
-import companyService from '../services/company.service';
+  TextInput,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { QueueScreenProps } from "../types/navigation";
+import documentService from "../services/document.service";
+import type { PreprocessingDocument, QueueStats, QueueSummaryStatus } from "../types/models";
+import DocumentRow from "../components/DocumentRow";
+import EmptyState from "../components/EmptyState";
+import Screen from "../components/Screen";
+import PageHeader from "../components/PageHeader";
+import { apiErrorMessage } from "../utils/errors";
+import { mergeUniqueById } from "../utils/lists";
+import { radius, space, useAppTheme, useThemedStyles, type ThemeTokens } from "../theme";
 
-export default function ProcessingQueueScreen({ navigation }: ProcessingQueueScreenProps) {
-  const [documents, setDocuments] = useState<Document[]>([]);
+export default function ProcessingQueueScreen({ navigation }: QueueScreenProps) {
+  const { colors } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
+  const [documents, setDocuments] = useState<PreprocessingDocument[]>([]);
+  const [stats, setStats] = useState<QueueStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  const [companyName, setCompanyName] = useState('');
+  const [search, setSearch] = useState("");
+  const [summaryStatus, setSummaryStatus] = useState<QueueSummaryStatus | undefined>();
+  const searchRef = useRef(search);
+  const fetchGen = useRef(0);
+  const loadingMoreRef = useRef(false);
 
   useEffect(() => {
-    loadCompanyInfo();
-    loadDocuments();
-  }, []);
+    searchRef.current = search;
+  }, [search]);
 
-  const loadCompanyInfo = async () => {
-    const company = await companyService.getSelectedCompany();
-    if (company) {
-      setCompanyName(company.name);
-    }
-  };
-
-  const loadDocuments = async (pageNum: number = 1) => {
-    try {
-      const response = await documentService.getProcessingQueue({ page: pageNum });
-      
-      if (pageNum === 1) {
-        setDocuments(response.results);
-      } else {
-        setDocuments(prev => [...prev, ...response.results]);
+  const loadDocuments = useCallback(
+    async (pageNum = 1, replace = false, query = searchRef.current) => {
+      const isReplace = replace || pageNum === 1;
+      if (isReplace) {
+        fetchGen.current += 1;
       }
-      
-      setHasMore(!!response.next);
-      setPage(pageNum);
-    } catch (error: any) {
-      Alert.alert('Error', 'Failed to load documents. Please try again.');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+      const gen = fetchGen.current;
+      try {
+        const [queue, queueStats] = await Promise.all([
+          documentService.getProcessingQueue({
+            page: pageNum,
+            search: query.trim() || undefined,
+            summary_status: summaryStatus,
+          }),
+          pageNum === 1 ? documentService.getQueueStats() : Promise.resolve(null),
+        ]);
+        if (gen !== fetchGen.current) {
+          return;
+        }
+
+        setDocuments((prev) => mergeUniqueById(prev, queue.results, replace || pageNum === 1));
+        setHasMore(Boolean(queue.next));
+        setPage(pageNum);
+        if (queueStats) {
+          setStats(queueStats);
+        }
+      } catch (error: unknown) {
+        if (gen !== fetchGen.current) {
+          return;
+        }
+        Alert.alert("Could not load queue", apiErrorMessage(error));
+      } finally {
+        if (gen !== fetchGen.current) {
+          return;
+        }
+        loadingMoreRef.current = false;
+        setLoading(false);
+        setRefreshing(false);
+        setLoadingMore(false);
+      }
+    },
+    [summaryStatus]
+  );
+
+  useEffect(() => {
+    void loadDocuments(1, true);
+  }, [loadDocuments]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    loadDocuments(1);
-  }, []);
+    void loadDocuments(1, true);
+  }, [loadDocuments]);
 
   const loadMore = () => {
-    if (!loading && hasMore) {
-      setLoading(true);
-      loadDocuments(page + 1);
+    if (loading || loadingMoreRef.current || refreshing || !hasMore) {
+      return;
     }
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+    void loadDocuments(page + 1);
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return '#34C759';
-      case 'processing':
-        return '#007AFF';
-      case 'failed':
-        return '#FF3B30';
-      case 'pending':
-        return '#FF9500';
-      default:
-        return '#8E8E93';
+  const handleSearch = () => {
+    searchRef.current = search;
+    setPage(1);
+    setLoading(true);
+    void loadDocuments(1, true, search);
+  };
+
+  const applyStatus = (next: QueueSummaryStatus | undefined) => {
+    if (summaryStatus === next) {
+      return;
     }
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    });
-  };
-
-  const renderDocumentItem = ({ item }: { item: Document }) => (
-    <TouchableOpacity
-      style={styles.documentCard}
-      onPress={() => navigation.navigate('DocumentDetail', { documentId: item.id })}
-    >
-      <View style={styles.documentHeader}>
-        <Text style={styles.fileName} numberOfLines={1}>
-          {item.file_name}
-        </Text>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-          <Text style={styles.statusText}>{item.status.toUpperCase()}</Text>
-        </View>
-      </View>
-      
-      <Text style={styles.dateText}>
-        Uploaded: {formatDate(item.uploaded_at)}
-      </Text>
-      
-      {item.processed_at && (
-        <Text style={styles.dateText}>
-          Processed: {formatDate(item.processed_at)}
-        </Text>
-      )}
-    </TouchableOpacity>
-  );
-
-  const handleChangeCompany = () => {
-    navigation.replace('CompanySelection');
+    setPage(1);
+    setLoading(true);
+    setSummaryStatus(next);
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Processing Queue</Text>
-          <Text style={styles.companyText}>{companyName}</Text>
+    <Screen edges={["bottom"]}>
+      <PageHeader
+        title="Queue"
+        subtitle="Documents in processing"
+        icon="file-tray-full-outline"
+        showBack={navigation.canGoBack()}
+        onBack={() => navigation.goBack()}
+        menuActions={[
+          {
+            key: "refresh",
+            label: "Refresh",
+            onPress: () => {
+              setRefreshing(true);
+              void loadDocuments(1, true);
+            },
+          },
+        ]}
+      />
+
+      {stats ? (
+        <View style={styles.statsRow}>
+          <StatChip
+            label="Total"
+            value={stats.total}
+            active={!summaryStatus}
+            onPress={() => applyStatus(undefined)}
+          />
+          <StatChip
+            label="In progress"
+            value={stats.processing}
+            active={summaryStatus === "processing"}
+            onPress={() => applyStatus("processing")}
+          />
+          <StatChip
+            label="Done"
+            value={stats.completed}
+            active={summaryStatus === "completed"}
+            onPress={() => applyStatus("completed")}
+          />
+          <StatChip
+            label="Issues"
+            value={stats.failed}
+            accent={stats.failed > 0}
+            active={summaryStatus === "failed"}
+            onPress={() => applyStatus("failed")}
+          />
         </View>
-        <TouchableOpacity onPress={handleChangeCompany} style={styles.changeButton}>
-          <Text style={styles.changeButtonText}>Change</Text>
-        </TouchableOpacity>
+      ) : null}
+
+      <View style={styles.searchRow}>
+        <Ionicons name="search" size={16} color={colors.textMuted} />
+        <TextInput
+          style={styles.search}
+          placeholder="Search file name"
+          placeholderTextColor={colors.textPlaceholder}
+          value={search}
+          onChangeText={setSearch}
+          returnKeyType="search"
+          onSubmitEditing={handleSearch}
+        />
       </View>
 
       <FlatList
         data={documents}
-        renderItem={renderDocumentItem}
-        keyExtractor={(item) => item.id.toString()}
-        contentContainerStyle={styles.listContainer}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
+        renderItem={({ item }) => (
+          <DocumentRow
+            item={item}
+            onPress={() => navigation.navigate("DocumentDetail", { documentId: item.id })}
+          />
+        )}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.list}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         onEndReached={loadMore}
-        onEndReachedThreshold={0.5}
-        ListFooterComponent={
-          loading && page > 1 ? (
-            <ActivityIndicator style={styles.loadingMore} />
-          ) : null
-        }
+        onEndReachedThreshold={0.4}
+        ListFooterComponent={loadingMore ? <ActivityIndicator style={styles.loadingMore} /> : null}
         ListEmptyComponent={
           !loading ? (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No documents found</Text>
-            </View>
+            <EmptyState
+              title="No documents in this queue"
+              hint="Capture a receipt or upload a PDF to get started."
+            />
           ) : null
         }
       />
 
-      {loading && page === 1 && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color="#007AFF" />
+      {loading ? (
+        <View style={styles.overlay}>
+          <ActivityIndicator size="large" color={colors.brand} />
         </View>
-      )}
-    </View>
+      ) : null}
+    </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  companyText: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
-  },
-  changeButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  changeButtonText: {
-    color: '#007AFF',
-    fontSize: 16,
-  },
-  listContainer: {
-    padding: 16,
-  },
-  documentCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  documentHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  fileName: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginRight: 12,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  statusText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  dateText: {
-    fontSize: 13,
-    color: '#666',
-    marginTop: 4,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    marginTop: 48,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#999',
-  },
-  loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingMore: {
-    marginVertical: 16,
-  },
-});
+function StatChip({
+  label,
+  value,
+  accent,
+  active,
+  onPress,
+}: {
+  label: string;
+  value: number;
+  accent?: boolean;
+  active?: boolean;
+  onPress: () => void;
+}) {
+  const { colors } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
+  return (
+    <TouchableOpacity
+      style={[styles.statChip, active && styles.statChipActive]}
+      onPress={onPress}
+      activeOpacity={0.8}
+      accessibilityRole="button"
+      accessibilityState={{ selected: Boolean(active) }}
+    >
+      <Text
+        style={[
+          styles.statValue,
+          accent && { color: colors.danger },
+          active && styles.statValueActive,
+        ]}
+      >
+        {value}
+      </Text>
+      <Text style={[styles.statLabel, active && styles.statLabelActive]}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
+function createStyles({ colors, type }: ThemeTokens) {
+  return {
+    statsRow: {
+      flexDirection: "row",
+      paddingHorizontal: space.lg,
+      paddingTop: space.md,
+      gap: space.sm,
+    },
+    statChip: {
+      flex: 1,
+      backgroundColor: colors.surface,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingVertical: 10,
+      paddingHorizontal: 4,
+      alignItems: "center",
+    },
+    statChipActive: {
+      backgroundColor: colors.brandSoft,
+      borderColor: colors.brand,
+    },
+    statValue: {
+      ...type.heading,
+      color: colors.text,
+    },
+    statValueActive: {
+      color: colors.brand,
+    },
+    statLabel: {
+      ...type.overline,
+      color: colors.textSecondary,
+      marginTop: 2,
+      textAlign: "center",
+    },
+    statLabelActive: {
+      color: colors.brand,
+    },
+    searchRow: {
+      marginHorizontal: space.lg,
+      marginTop: space.md,
+      backgroundColor: colors.surface,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingHorizontal: 12,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    search: {
+      ...type.input,
+      flex: 1,
+      paddingVertical: 10,
+    },
+    list: {
+      paddingHorizontal: space.lg,
+      paddingTop: space.md,
+      paddingBottom: space.xxxl,
+    },
+    overlay: {
+      ...StyleSheet.absoluteFill,
+      backgroundColor: colors.overlay,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    loadingMore: {
+      marginVertical: space.lg,
+    },
+  };
+}

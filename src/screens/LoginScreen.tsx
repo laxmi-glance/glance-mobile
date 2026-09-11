@@ -1,139 +1,110 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
-import { LoginScreenProps } from '../types/navigation';
-import authService from '../services/auth.service';
+import React, { useState } from "react";
+import { View, Text, StyleSheet, Linking } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
+import { LoginScreenProps } from "../types/navigation";
+import BrandMark from "../components/BrandMark";
+import Button from "../components/Button";
+import { colors, space, type } from "../theme";
 
 export default function LoginScreen({ navigation }: LoginScreenProps) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [opening, setOpening] = useState(false);
 
-  const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please enter both email and password');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      await authService.login({ email, password });
-      // Navigate to company selection after successful login
-      navigation.replace('CompanySelection');
-    } catch (error: any) {
-      Alert.alert(
-        'Login Failed',
-        error.response?.data?.detail || 'Invalid credentials. Please try again.'
-      );
-    } finally {
-      setLoading(false);
-    }
+  const handleSignIn = () => {
+    setOpening(true);
+    navigation.navigate("WebAuthLogin");
+    setTimeout(() => setOpening(false), 400);
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
-      <View style={styles.content}>
-        <Text style={styles.title}>Glancewise</Text>
-        <Text style={styles.subtitle}>Sign in to continue</Text>
-
-        <View style={styles.form}>
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            editable={!loading}
-          />
-
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            editable={!loading}
-          />
-
-          <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleLogin}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>Sign In</Text>
-            )}
-          </TouchableOpacity>
-        </View>
+    <View style={styles.root}>
+      <StatusBar style="light" />
+      <View style={styles.hero}>
+        <BrandMark size={72} />
+        <Text style={styles.logo}>Glancewise</Text>
+        <Text style={styles.tagline}>Finance operations on autopilot</Text>
       </View>
-    </KeyboardAvoidingView>
+
+      <SafeAreaView style={styles.sheet} edges={["bottom"]}>
+        <Text style={styles.title}>Sign in</Text>
+        <Text style={styles.lead}>
+          Connect this app to your Glance workspace. You will finish login in your browser,
+          including 2FA if it is enabled, then return here.
+        </Text>
+
+        <Button
+          label="Sign in to Glance"
+          onPress={handleSignIn}
+          loading={opening}
+          icon="log-in-outline"
+          style={styles.cta}
+        />
+
+        <Text style={styles.footer}>
+          New to Glancewise?{" "}
+          <Text style={styles.link} onPress={() => Linking.openURL("https://glancewise.app")}>
+            Start a free trial
+          </Text>
+        </Text>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.brandNavy,
   },
-  content: {
+  hero: {
     flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: space.xxxl,
+  },
+  logo: {
+    ...type.display,
+    marginTop: space.lg,
+    fontSize: 32,
+    lineHeight: 38,
+    color: colors.white,
+  },
+  tagline: {
+    ...type.body,
+    marginTop: space.sm,
+    color: colors.textOnDarkMuted,
+    textAlign: "center",
+  },
+  sheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: space.xxl,
+    paddingTop: space.xxl,
+    paddingBottom: space.lg,
   },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
-    textAlign: 'center',
+    ...type.title,
+    fontSize: 24,
+    lineHeight: 30,
   },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 48,
-    textAlign: 'center',
+  lead: {
+    ...type.callout,
+    marginTop: space.sm,
+    marginBottom: space.xl,
+    color: colors.textSecondary,
   },
-  form: {
-    width: '100%',
+  cta: {
+    marginBottom: space.lg,
   },
-  input: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    marginBottom: 16,
+  footer: {
+    ...type.meta,
+    textAlign: "center",
+    marginBottom: space.md,
   },
-  button: {
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+  link: {
+    ...type.link,
+    fontSize: 13,
+    lineHeight: 18,
   },
 });

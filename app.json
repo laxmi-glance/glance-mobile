@@ -2,34 +2,76 @@
   "expo": {
     "name": "Glancewise",
     "slug": "glancewise-mobile",
-    "version": "1.0.0",
+    "scheme": "glancewise",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
+    "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.glancewise.mobile"
+      "bundleIdentifier": "com.glancewise.mobile",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "Glancewise uses the camera to capture invoices and receipts.",
+        "NSPhotoLibraryUsageDescription": "Glancewise uses your photo library to upload invoices and receipts.",
+        "NSFaceIDUsageDescription": "Glancewise uses Face ID to unlock the app after you sign in."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#13003E"
       },
       "package": "com.glancewise.mobile",
+      "allowBackup": false,
       "permissions": [
-        "android.permission.INTERNET"
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.CAMERA"
       ],
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Glancewise uses the camera to capture invoices and receipts.",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Glancewise uses the camera to capture invoices and receipts.",
+          "photosPermission": "Glancewise uses your photo library to upload invoices and receipts."
+        }
+      ],
+      "expo-document-picker",
+      "expo-font",
+      "expo-secure-store",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Glancewise uses Face ID to unlock the app after you sign in."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#13003E",
+          "image": "./assets/splash-icon.png",
+          "resizeMode": "contain",
+          "enableFullScreenImage_legacy": true
+        }
+      ]
+    ],
+    "extra": {
+      "apiBaseUrl": "",
+      "eas": {
+        "projectId": "2f839f17-366e-45a0-9633-a363ae4d4faa"
+      }
     }
   }
 }

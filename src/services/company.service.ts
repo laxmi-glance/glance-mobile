@@ -1,45 +1,19 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import apiClient from '../config/api';
+import { apiClient } from "../config/api";
 
-export interface Company {
-  id: number;
-  name: string;
-  logo?: string;
-  // Add other company fields as needed
-}
+export type CompanyProfile = {
+  id?: string;
+  name?: string | null;
+  logo?: string | null;
+  logo_url?: string | null;
+};
 
 class CompanyService {
-  async getCompanies(): Promise<Company[]> {
+  async getCurrent(): Promise<CompanyProfile | null> {
     try {
-      const response = await apiClient.get<Company[]>('/companies/');
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  async selectCompany(company: Company): Promise<void> {
-    try {
-      await AsyncStorage.setItem('selectedCompany', JSON.stringify(company));
-    } catch (error) {
-      console.error('Error selecting company:', error);
-    }
-  }
-
-  async getSelectedCompany(): Promise<Company | null> {
-    try {
-      const companyStr = await AsyncStorage.getItem('selectedCompany');
-      return companyStr ? JSON.parse(companyStr) : null;
-    } catch (error) {
+      const { data } = await apiClient.get<CompanyProfile>("/company/");
+      return data;
+    } catch {
       return null;
-    }
-  }
-
-  async clearSelectedCompany(): Promise<void> {
-    try {
-      await AsyncStorage.removeItem('selectedCompany');
-    } catch (error) {
-      console.error('Error clearing selected company:', error);
     }
   }
 }

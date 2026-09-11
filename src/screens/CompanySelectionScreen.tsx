@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -7,162 +7,365 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
-} from 'react-native';
-import { CompanySelectionScreenProps } from '../types/navigation';
-import companyService, { Company } from '../services/company.service';
-import authService from '../services/auth.service';
+  RefreshControl,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { CompanySelectionScreenProps } from "../types/navigation";
+import tenantService from "../services/tenant.service";
+import authService from "../services/auth.service";
+import type { Tenant } from "../types/models";
+import { apiErrorMessage } from "../utils/errors";
+import Screen from "../components/Screen";
+import PageHeader from "../components/PageHeader";
+import CompanyLogo from "../components/CompanyLogo";
+import EmptyState from "../components/EmptyState";
+import {
+  THEME_AUTO,
+  radius,
+  space,
+  useAppTheme,
+  useThemedStyles,
+  type ThemeTokens,
+} from "../theme";
+
+function formatRole(role?: string | null) {
+  const value = (role || "").trim().replace(/_/g, " ");
+  if (!value) {
+    return "";
+  }
+  return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+}
 
 export default function CompanySelectionScreen({ navigation }: CompanySelectionScreenProps) {
-  const [companies, setCompanies] = useState<Company[]>([]);
+  const { colors, hydrateFromServer, setTheme } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
+  const canGoBack = navigation.canGoBack();
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [selectingId, setSelectingId] = useState<string | null>(null);
+  const fetchGen = useRef(0);
 
-  useEffect(() => {
-    loadCompanies();
+  const loadTenants = useCallback(async (isRefresh = false) => {
+    fetchGen.current += 1;
+    const gen = fetchGen.current;
+    try {
+      const [stored, current] = await Promise.all([
+        authService.getStoredTenants(),
+        tenantService.getSelectedTenant(),
+      ]);
+      if (gen !== fetchGen.current) {
+        return;
+      }
+      if (stored.length && !isRefresh) {
+        setTenants(stored);
+      }
+      if (current?.tenant_id) {
+        setSelectedId(current.tenant_id);
+      }
+      const data = await tenantService.listTenants();
+      if (gen !== fetchGen.current) {
+        return;
+      }
+      setTenants(data);
+      const latest = data.find((tenant) => tenant.is_current)?.tenant_id || current?.tenant_id;
+      if (latest) {
+        setSelectedId(latest);
+      }
+    } catch (error: unknown) {
+      if (gen !== fetchGen.current) {
+        return;
+      }
+      const stored = await authService.getStoredTenants();
+      if (stored.length) {
+        setTenants(stored);
+      } else {
+        Alert.alert("Could not load workspaces", apiErrorMessage(error));
+      }
+    } finally {
+      if (gen !== fetchGen.current) {
+        return;
+      }
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
 
-  const loadCompanies = async () => {
+  useEffect(() => {
+    void loadTenants(); // eslint-disable-line react-hooks/set-state-in-effect -- load workspaces after async API call
+  }, [loadTenants]);
+
+  const openWorkspace = () => {
+    if (canGoBack) {
+      navigation.goBack();
+      return;
+    }
+    navigation.reset({ index: 0, routes: [{ name: "Main" }] });
+  };
+
+  const handleSelectTenant = async (tenant: Tenant) => {
+    if (tenant.is_deactivated) {
+      Alert.alert("Workspace unavailable", tenant.access_notice || "This company is not active.");
+      return;
+    }
+    if (selectedId && tenant.tenant_id === selectedId) {
+      openWorkspace();
+      return;
+    }
+
+    setSelectingId(tenant.tenant_id);
     try {
-      const data = await companyService.getCompanies();
-      setCompanies(data);
-    } catch (error: any) {
-      Alert.alert('Error', 'Failed to load companies. Please try again.');
+      await authService.selectTenant(tenant.tenant_id);
+      await tenantService.persistSelectedTenant({ ...tenant, is_current: true });
+      await hydrateFromServer();
+      navigation.reset({ index: 0, routes: [{ name: "Main" }] });
+    } catch (error: unknown) {
+      Alert.alert("Could not open workspace", apiErrorMessage(error));
     } finally {
-      setLoading(false);
+      setSelectingId(null);
     }
   };
 
-  const handleSelectCompany = async (company: Company) => {
-    await companyService.selectCompany(company);
-    navigation.replace('ProcessingQueue');
-  };
-
-  const handleLogout = async () => {
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
-      { text: 'Cancel', style: 'cancel' },
+  const handleLogout = () => {
+    Alert.alert("Sign out", "Are you sure you want to sign out?", [
+      { text: "Cancel", style: "cancel" },
       {
-        text: 'Logout',
-        style: 'destructive',
+        text: "Sign out",
+        style: "destructive",
         onPress: async () => {
           await authService.logout();
-          navigation.replace('Login');
+          await setTheme(THEME_AUTO, { syncBackend: false });
+          navigation.replace("Login");
         },
       },
     ]);
   };
 
-  const renderCompanyItem = ({ item }: { item: Company }) => (
-    <TouchableOpacity
-      style={styles.companyCard}
-      onPress={() => handleSelectCompany(item)}
-    >
-      <View style={styles.companyInfo}>
-        <Text style={styles.companyName}>{item.name}</Text>
-      </View>
-      <Text style={styles.arrow}>›</Text>
-    </TouchableOpacity>
-  );
+  const renderTenant = ({ item, index }: { item: Tenant; index: number }) => {
+    const disabled = Boolean(item.is_deactivated);
+    const busy = selectingId === item.tenant_id;
+    const current = Boolean(selectedId && item.tenant_id === selectedId);
+    const role = formatRole(item.role);
+    const logoUri = item.logo || item.logo_url || null;
 
-  if (loading) {
     return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
-      </View>
+      <TouchableOpacity
+        style={[
+          styles.row,
+          current && styles.rowCurrent,
+          disabled && styles.rowDisabled,
+          index === 0 && styles.rowFirst,
+          index === tenants.length - 1 && styles.rowLast,
+        ]}
+        onPress={() => handleSelectTenant(item)}
+        disabled={disabled || Boolean(selectingId)}
+        activeOpacity={0.75}
+        accessibilityRole="button"
+        accessibilityState={{ selected: current, disabled }}
+        accessibilityLabel={item.company_name || "Workspace"}
+      >
+        <CompanyLogo uri={logoUri} size={40} />
+        <View style={styles.rowInfo}>
+          <Text style={styles.companyName} numberOfLines={1}>
+            {item.company_name || "Untitled workspace"}
+          </Text>
+          <View style={styles.metaRow}>
+            {role ? (
+              <View style={[styles.rolePill, current && styles.rolePillCurrent]}>
+                <Text style={[styles.roleText, current && styles.roleTextCurrent]}>{role}</Text>
+              </View>
+            ) : null}
+            {item.lifecycle_status && item.lifecycle_status !== "ACTIVE" ? (
+              <Text style={styles.lifecycle}>{item.lifecycle_status}</Text>
+            ) : null}
+          </View>
+          {disabled && item.access_notice ? (
+            <Text style={styles.notice} numberOfLines={2}>
+              {item.access_notice}
+            </Text>
+          ) : null}
+        </View>
+        {busy ? (
+          <ActivityIndicator color={colors.brand} />
+        ) : current ? (
+          <View style={styles.check}>
+            <Ionicons name="checkmark" size={16} color={colors.white} />
+          </View>
+        ) : (
+          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+        )}
+      </TouchableOpacity>
     );
-  }
+  };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Select Company</Text>
-        <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-          <Text style={styles.logoutText}>Logout</Text>
-        </TouchableOpacity>
-      </View>
-
-      <FlatList
-        data={companies}
-        renderItem={renderCompanyItem}
-        keyExtractor={(item) => item.id.toString()}
-        contentContainerStyle={styles.listContainer}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No companies found</Text>
-          </View>
+    <Screen edges={["bottom"]}>
+      <PageHeader
+        title="Workspaces"
+        subtitle={canGoBack ? "Switch to another company" : "Choose a company to continue"}
+        icon="swap-horizontal-outline"
+        showBack={canGoBack}
+        onBack={() => navigation.goBack()}
+        menuActions={
+          canGoBack
+            ? [{ key: "refresh", label: "Refresh", onPress: () => void loadTenants(true) }]
+            : [
+                { key: "refresh", label: "Refresh", onPress: () => void loadTenants(true) },
+                { key: "signout", label: "Sign out", destructive: true, onPress: handleLogout },
+              ]
         }
       />
-    </View>
+
+      {loading ? (
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={colors.brand} />
+        </View>
+      ) : (
+        <FlatList
+          data={tenants}
+          renderItem={renderTenant}
+          keyExtractor={(item) => item.tenant_id}
+          contentContainerStyle={styles.list}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                void loadTenants(true);
+              }}
+            />
+          }
+          ListHeaderComponent={
+            tenants.length ? <Text style={styles.section}>Companies</Text> : null
+          }
+          ListEmptyComponent={
+            <EmptyState title="No workspaces" hint="No companies are linked to this account yet." />
+          }
+          ListFooterComponent={
+            canGoBack ? null : (
+              <TouchableOpacity
+                onPress={handleLogout}
+                style={styles.signOut}
+                accessibilityRole="button"
+                accessibilityLabel="Sign out"
+              >
+                <Text style={styles.signOutText}>Sign out</Text>
+              </TouchableOpacity>
+            )
+          }
+        />
+      )}
+    </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  logoutButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  logoutText: {
-    color: '#FF3B30',
-    fontSize: 16,
-  },
-  listContainer: {
-    padding: 16,
-  },
-  companyCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  companyInfo: {
-    flex: 1,
-  },
-  companyName: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-  },
-  arrow: {
-    fontSize: 28,
-    color: '#ccc',
-    marginLeft: 12,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    marginTop: 48,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#999',
-  },
-});
+function createStyles({ colors, type }: ThemeTokens) {
+  return {
+    center: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    list: {
+      paddingHorizontal: space.lg,
+      paddingTop: space.md,
+      paddingBottom: space.xxxl,
+    },
+    section: {
+      ...type.overline,
+      marginBottom: space.sm,
+      marginLeft: 4,
+      textTransform: "uppercase",
+    },
+    row: {
+      backgroundColor: colors.surface,
+      paddingVertical: 14,
+      paddingHorizontal: space.lg,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: space.md,
+      borderLeftWidth: 1,
+      borderRightWidth: 1,
+      borderColor: colors.border,
+    },
+    rowCurrent: {
+      backgroundColor: colors.brandSoft,
+    },
+    rowDisabled: {
+      opacity: 0.55,
+    },
+    rowFirst: {
+      borderTopWidth: 1,
+      borderTopLeftRadius: radius.lg,
+      borderTopRightRadius: radius.lg,
+    },
+    rowLast: {
+      borderBottomWidth: 1,
+      borderBottomLeftRadius: radius.lg,
+      borderBottomRightRadius: radius.lg,
+    },
+    separator: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: colors.border,
+      marginLeft: 40 + space.lg + space.md,
+    },
+    rowInfo: {
+      flex: 1,
+      minWidth: 0,
+    },
+    companyName: {
+      ...type.subtitle,
+      color: colors.textHeading,
+    },
+    metaRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      marginTop: 6,
+    },
+    rolePill: {
+      alignSelf: "flex-start",
+      backgroundColor: colors.surfaceMuted,
+      borderRadius: 999,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+    },
+    rolePillCurrent: {
+      backgroundColor: colors.white,
+    },
+    roleText: {
+      ...type.overline,
+      color: colors.brand,
+    },
+    roleTextCurrent: {
+      color: colors.brand,
+    },
+    lifecycle: {
+      ...type.overline,
+      textTransform: "capitalize",
+    },
+    notice: {
+      ...type.caption,
+      marginTop: 6,
+      color: colors.danger,
+    },
+    check: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: colors.brand,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    signOut: {
+      alignItems: "center",
+      paddingVertical: space.xl,
+    },
+    signOutText: {
+      ...type.cardTitle,
+      color: colors.danger,
+    },
+  };
+}

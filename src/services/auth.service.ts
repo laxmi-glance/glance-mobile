@@ -1,80 +1,100 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import apiClient from '../config/api';
-
-export interface LoginCredentials {
-  email: string;
-  password: string;
-}
-
-export interface User {
-  id: number;
-  email: string;
-  first_name: string;
-  last_name: string;
-  // Add other user fields as needed
-}
-
-export interface AuthResponse {
-  access: string;
-  refresh: string;
-  user: User;
-}
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { apiClient } from "../config/api";
+import {
+  StorageKeys,
+  clearSession,
+  getAccessToken,
+  getJson,
+  getRefreshToken,
+  setJson,
+  setTokenPair,
+} from "../core/storage";
+import { userIdFromAccessToken } from "../utils/jwt";
+import rbacService from "./rbac.service";
+import type { LoginResponse, Tenant, TokenPair, UserProfile } from "../types/models";
 
 class AuthService {
-  async login(credentials: LoginCredentials): Promise<AuthResponse> {
-    try {
-      const response = await apiClient.post<AuthResponse>('/auth/login/', credentials);
-      
-      // Store tokens and user data
-      await AsyncStorage.setItem('authToken', response.data.access);
-      await AsyncStorage.setItem('refreshToken', response.data.refresh);
-      await AsyncStorage.setItem('user', JSON.stringify(response.data.user));
-      
-      return response.data;
-    } catch (error) {
-      throw error;
+  async persistLoginSession(data: LoginResponse): Promise<void> {
+    await setTokenPair(data.access, data.refresh);
+    const userId = userIdFromAccessToken(data.access);
+    if (userId) {
+      await AsyncStorage.setItem(StorageKeys.userId, userId);
+    } else {
+      await AsyncStorage.removeItem(StorageKeys.userId);
     }
+    await AsyncStorage.removeItem(StorageKeys.tenantId);
+    await AsyncStorage.removeItem(StorageKeys.selectedTenant);
+    await AsyncStorage.removeItem(StorageKeys.rbacConfig);
+    await setJson(StorageKeys.availableTenants, data.tenants ?? []);
+  }
+
+  async selectTenant(tenantId: string): Promise<TokenPair> {
+    const { data } = await apiClient.post<TokenPair>("/users/select-tenant/", {
+      tenant_id: tenantId,
+    });
+
+    await setTokenPair(data.access, data.refresh);
+    await AsyncStorage.setItem(StorageKeys.tenantId, tenantId);
+
+    const userId = userIdFromAccessToken(data.access);
+    if (userId) {
+      await AsyncStorage.setItem(StorageKeys.userId, userId);
+    }
+
+    const tenants = (await getJson<Tenant[]>(StorageKeys.availableTenants)) ?? [];
+    const selected = tenants.find((tenant) => tenant.tenant_id === tenantId) ?? null;
+    if (selected) {
+      await setJson(StorageKeys.selectedTenant, { ...selected, is_current: true });
+    }
+
+    await rbacService.sync().catch(() => undefined);
+
+    return data;
+  }
+
+  async getProfile(): Promise<UserProfile> {
+    const { data } = await apiClient.get<UserProfile>("/users/me/");
+    return data;
   }
 
   async logout(): Promise<void> {
+    const refresh = await getRefreshToken();
     try {
-      await AsyncStorage.multiRemove(['authToken', 'refreshToken', 'user', 'selectedCompany']);
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
-  }
-
-  async getCurrentUser(): Promise<User | null> {
-    try {
-      const userStr = await AsyncStorage.getItem('user');
-      return userStr ? JSON.parse(userStr) : null;
-    } catch (error) {
-      return null;
+      if (refresh) {
+        await apiClient.post("/users/logout/", { refresh });
+      }
+    } catch {
+      // Honor local logout even if the blacklist call fails (expired token, offline).
+    } finally {
+      await clearSession();
     }
   }
 
   async isAuthenticated(): Promise<boolean> {
-    const token = await AsyncStorage.getItem('authToken');
-    return !!token;
+    const token = await getAccessToken();
+    return Boolean(token);
   }
 
-  async refreshToken(): Promise<string> {
-    try {
-      const refreshToken = await AsyncStorage.getItem('refreshToken');
-      if (!refreshToken) {
-        throw new Error('No refresh token available');
-      }
+  async hasSelectedTenant(): Promise<boolean> {
+    const tenantId = await AsyncStorage.getItem(StorageKeys.tenantId);
+    return Boolean(tenantId);
+  }
 
-      const response = await apiClient.post<{ access: string }>('/auth/token/refresh/', {
-        refresh: refreshToken,
-      });
+  async getStoredTenants(): Promise<Tenant[]> {
+    return (await getJson<Tenant[]>(StorageKeys.availableTenants)) ?? [];
+  }
 
-      await AsyncStorage.setItem('authToken', response.data.access);
-      return response.data.access;
-    } catch (error) {
-      await this.logout();
-      throw error;
+  async getStoredUserId(): Promise<string | null> {
+    const stored = await AsyncStorage.getItem(StorageKeys.userId);
+    if (stored) {
+      return stored;
     }
+    const token = await getAccessToken();
+    const userId = userIdFromAccessToken(token);
+    if (userId) {
+      await AsyncStorage.setItem(StorageKeys.userId, userId);
+    }
+    return userId;
   }
 }
 

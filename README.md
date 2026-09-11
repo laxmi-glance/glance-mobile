@@ -1,294 +1,126 @@
-# Glancewise Mobile App
+# Glancewise Mobile
 
-React Native mobile application for Glancewise built with Expo.
+React Native (Expo) companion app for Glancewise. It uses the same tenant APIs as the web app.
 
-## Features
+| Field | Value |
+|-------|-------|
+| **Document ID** | MO-DOC-010 |
+| **Version** | 2.0 |
+| **Owner** | Engineering |
+| **Last updated** | 2026-09-02 |
+| **Classification** | Internal |
+| **Audience** | Mobile developers, QA |
 
-- ✅ User Authentication (Login/Logout)
-- ✅ Company Selection
-- ✅ Document Processing Queue View
-- ✅ Document Details
-- ✅ Pull to Refresh
-- ✅ Infinite Scroll
-- ✅ Status Badges
+## Purpose
 
-## Tech Stack
+Product overview, auth contract, and quick start. Run/build/EAS procedures: **[HELP.md](./HELP.md)**. Full index: **[docs/README.md](docs/README.md)**.
 
-- React Native
-- Expo
+## What this app does
+
+- Two-step login (`/users/login/` then `/users/select-tenant/`)
+- Workspace switcher with `X-Tenant-ID`
+- Document processing queue (list, stats, search, status filters)
+- Document detail and retry
+- Camera / photo library / PDF upload
+- Notifications
+- Session refresh with rotating refresh tokens
+
+It is **not** a full replacement for the web product (no GL, reports, banking, billing, or connectors).
+
+## Tech stack
+
+- Expo SDK 57 / React Native 0.86
 - TypeScript
 - React Navigation
-- Axios
-- AsyncStorage
+- Axios + AsyncStorage
 
 ## Prerequisites
 
-- Node.js >= 20.16.0 (or use your current version)
-- npm or pnpm
-- Expo Go app (for testing on physical devices)
-- iOS Simulator (Mac only) or Android Emulator
+- Node.js >= 20.19.4 (22.13+ recommended)
+- pnpm
+- Expo Go (device testing) or iOS Simulator / Android Emulator
+- A Glancewise backend (`dev` / staging) with `DISABLE_RECAPTCHA=true` until native reCAPTCHA is added
 
-## Installation
+## Install and run
 
 ```bash
 cd glance-mobile
-npm install
+pnpm install
+pnpm start:staging      # device testing against staging API
+pnpm start:local        # simulator/emulator + local Django
+pnpm start:production   # production API
 ```
 
-## Configuration
+Do **not** use `npx expo start:staging` — Expo CLI has no such command; use pnpm scripts.
 
-Update the API base URL in `src/config/api.ts`:
+Then scan the QR code with Expo Go (physical device) or press `i` / `a` for simulators.
 
-```typescript
-export const API_BASE_URL = __DEV__ 
-  ? 'http://localhost:8000/api'  // Local development
-  : 'https://staging.glancewise.app/api';  // Staging/Production
-```
+## API environments
 
-### Important API Endpoints
+Configured in `src/config/env.ts`. Override with `EXPO_PUBLIC_API_BASE_URL` when needed.
 
-Make sure your backend has these endpoints:
+| Script | API base | Web app |
+|--------|----------|---------|
+| `start:local` | iOS `http://localhost:8000/api` · Android emulator `http://10.0.2.2:8000/api` | — |
+| `start:staging` | `https://api.staging.glancewise.app/api` | `https://staging.glancewise.app` |
+| `start:production` | `https://api.glancewise.app/api` | `https://app.glancewise.app` |
 
-- `POST /api/auth/login/` - User login
-- `POST /api/auth/token/refresh/` - Refresh token
-- `GET /api/companies/` - Get list of companies
-- `GET /api/documents/processing-queue/` - Get processing queue
-- `GET /api/documents/{id}/` - Get document details
-- `POST /api/documents/{id}/retry/` - Retry failed document
-
-## Running the App
-
-### Development Mode
+Physical devices cannot reach `localhost`. Use `start:staging` or:
 
 ```bash
-# Start the Expo development server
-npm start
-
-# Or run on specific platforms
-npm run android   # Android
-npm run ios       # iOS (Mac only)
-npm run web       # Web browser
+EXPO_PUBLIC_API_BASE_URL=http://YOUR_LAN_IP:8000/api pnpm start:local
 ```
 
-### Using Expo Go
+Staging login may require `DISABLE_RECAPTCHA=true` on the backend until native reCAPTCHA is wired.
 
-1. Install Expo Go on your mobile device
-2. Run `npm start`
-3. Scan the QR code with your device camera (iOS) or Expo Go app (Android)
+## Test flow (smoke)
 
-## Project Structure
+1. Sign in with an existing Glancewise username (or email) and password
+2. Select a workspace
+3. Review the processing queue, pull to refresh, open a document
+4. Upload from camera, photos, or PDF
+5. Open Notifications and Account (switch workspace / sign out)
+
+## Auth contract (matches glance-backend)
+
+1. `POST /api/users/login/` `{ username, password }` → `{ access, refresh, tenants[], pending_invitations[] }`
+2. `POST /api/users/select-tenant/` `{ tenant_id }` → tenant-scoped `{ access, refresh }`
+3. Every tenant API call sends `Authorization: Bearer <access>` and `X-Tenant-ID: <uuid>`
+4. `POST /api/users/token/refresh/` rotates both access and refresh tokens
+5. `POST /api/users/logout/` blacklists the refresh token
+
+### Other endpoints used
+
+- `GET /api/users/my-tenants/`
+- `GET /api/users/me/`
+- `GET /api/document-processing/preprocessing/` (`page`, `per_page`, `search`, `summary_status`)
+- `GET /api/document-processing/preprocessing/stats/`
+- `GET /api/document-processing/preprocessing/{uuid}/`
+- `POST /api/document-processing/preprocessing/{uuid}/retry/`
+- `POST /api/financial-document/upload-financial-documents/` (multipart field `documents`)
+- `GET /api/users/notifications/` and mark-read endpoints
+
+## Store builds (EAS)
+
+Per-environment versions live in `env-versions.json`. `pnpm build:staging` (and other `build:*` scripts) prompt to patch-bump that environment. See [HELP.md](./HELP.md) for EAS profiles, versioning, tunnel QA, and troubleshooting.
+
+## Project structure
 
 ```
-glance-mobile/
-├── App.tsx                 # Main app entry point with navigation
-├── src/
-│   ├── config/
-│   │   └── api.ts         # API configuration and interceptors
-│   ├── services/
-│   │   ├── auth.service.ts       # Authentication service
-│   │   ├── company.service.ts    # Company management
-│   │   └── document.service.ts   # Document operations
-│   ├── screens/
-│   │   ├── LoginScreen.tsx
-│   │   ├── CompanySelectionScreen.tsx
-│   │   ├── ProcessingQueueScreen.tsx
-│   │   └── DocumentDetailScreen.tsx
-│   └── types/
-│       └── navigation.ts  # TypeScript types for navigation
-└── package.json
+src/
+  config/          API client, env
+  core/            storage + session events
+  services/        auth, tenant, documents, notifications
+  screens/
+  navigation/
+  types/
+  utils/
 ```
 
-## Key Features Implementation
+## Revision history
 
-### Authentication Flow
-
-1. User enters credentials on Login screen
-2. App calls `/api/auth/login/` endpoint
-3. Stores access token, refresh token, and user data in AsyncStorage
-4. Navigates to Company Selection screen
-
-### Company Selection
-
-1. Fetches list of companies from backend
-2. User selects a company
-3. Stores selected company in AsyncStorage
-4. Navigates to Processing Queue
-
-### Processing Queue
-
-- Displays paginated list of documents
-- Pull to refresh functionality
-- Infinite scroll for loading more documents
-- Status badges (Processing, Completed, Failed, Pending)
-- Tap to view document details
-
-### Document Details
-
-- Shows detailed information about a document
-- Retry functionality for failed documents
-- Status tracking
-
-## Testing on Different Environments
-
-### Local Backend (Development)
-
-```typescript
-// In src/config/api.ts
-export const API_BASE_URL = 'http://localhost:8000/api';
-```
-
-**Note for iOS Simulator:** Use your computer's local IP address instead of `localhost`:
-```typescript
-export const API_BASE_URL = 'http://192.168.x.x:8000/api';
-```
-
-**Note for Android Emulator:** Use `10.0.2.2` instead of `localhost`:
-```typescript
-export const API_BASE_URL = 'http://10.0.2.2:8000/api';
-```
-
-### Staging Environment
-
-```typescript
-export const API_BASE_URL = 'https://staging.glancewise.app/api';
-```
-
-## Building for Production
-
-### Android
-
-```bash
-# Build APK
-eas build --platform android --profile preview
-
-# Build for Google Play Store
-eas build --platform android --profile production
-```
-
-### iOS
-
-```bash
-# Build for TestFlight
-eas build --platform ios --profile preview
-
-# Build for App Store
-eas build --platform ios --profile production
-```
-
-## Troubleshooting
-
-### Node Version Warnings
-
-The project requires Node >= 20.19.4, but it should work with Node 20.15.1. If you encounter issues, consider upgrading Node:
-
-```bash
-# Using nvm
-nvm install 20.19.4
-nvm use 20.19.4
-```
-
-### Connection Refused Errors
-
-1. Make sure your backend is running
-2. Check the API_BASE_URL configuration
-3. For physical devices, use your computer's IP address instead of localhost
-4. Ensure your device is on the same network as your development machine
-
-### Authentication Errors
-
-1. Verify the login endpoint returns the expected format:
-   ```json
-   {
-     "access": "token",
-     "refresh": "refresh_token",
-     "user": {...}
-   }
-   ```
-2. Check that the backend accepts the credentials
-
-### CORS Issues (if using web)
-
-Make sure your Django backend has CORS properly configured:
-
-```python
-# settings.py
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:19006",  # Expo web default port
-]
-```
-
-## API Response Examples
-
-### Login Response
-```json
-{
-  "access": "eyJ0eXAiOiJKV1QiLCJhbGc...",
-  "refresh": "eyJ0eXAiOiJKV1QiLCJhbGc...",
-  "user": {
-    "id": 1,
-    "email": "user@example.com",
-    "first_name": "John",
-    "last_name": "Doe"
-  }
-}
-```
-
-### Companies Response
-```json
-[
-  {
-    "id": 1,
-    "name": "Acme Corporation",
-    "logo": "https://example.com/logo.png"
-  }
-]
-```
-
-### Processing Queue Response
-```json
-{
-  "count": 50,
-  "next": "https://api.example.com/documents/processing-queue/?page=2",
-  "previous": null,
-  "results": [
-    {
-      "id": 1,
-      "file_name": "invoice_2024.pdf",
-      "status": "processing",
-      "uploaded_at": "2024-01-14T10:30:00Z",
-      "processed_at": null,
-      "file_type": "application/pdf",
-      "file_size": 1024000
-    }
-  ]
-}
-```
-
-## Next Steps
-
-1. **Add More Features:**
-   - Document upload functionality
-   - Advanced filtering and search
-   - Push notifications for processing completion
-   - Offline mode with data sync
-
-2. **Improve UI/UX:**
-   - Add custom fonts
-   - Implement dark mode
-   - Add animations
-   - Improve error handling with better UI feedback
-
-3. **Testing:**
-   - Add unit tests with Jest
-   - Add E2E tests with Detox
-   - Implement error tracking (Sentry)
-
-4. **Performance:**
-   - Implement image caching
-   - Add Redux or Context API for state management
-   - Optimize list rendering with React.memo
-
-## License
-
-Proprietary - Glancewise
-# glance-mobile
+| Date | Version | Author | Summary |
+|------|---------|--------|---------|
+| 2026-09-10 | 2.1 | Engineering | Per-env versions via env-versions.json and build bump prompt |
+| 2026-09-02 | 2.0 | Engineering | Merged GETTING_STARTED; aligned API URLs with env.ts |
+| 2026-06-01 | 1.0 | Engineering | Initial README |
