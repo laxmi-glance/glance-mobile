@@ -1,6 +1,6 @@
 import React from "react";
 import { Linking, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Feather, Ionicons } from "@expo/vector-icons";
 import { FRONTEND_URL } from "../../config/env";
 import {
   SECTION_ICONS,
@@ -20,7 +20,7 @@ export type HomeNavigation = {
   openDocuments: () => void;
   openReports: (reportId?: "profit-and-loss" | "balance-sheet") => void;
   openQueue: () => void;
-  openScanner: () => void;
+  openUpload: () => void;
   openApDocument: (id: string) => void;
 };
 
@@ -225,10 +225,10 @@ export default function DashboardFeed({
         const actions = [
           perms.canUpload
             ? {
-                key: "scan",
-                label: "Scan",
-                icon: "scan-outline" as IconName,
-                onPress: navigation.openScanner,
+                key: "upload",
+                label: "Upload",
+                icon: "cloud-upload-outline" as IconName,
+                onPress: navigation.openUpload,
               }
             : null,
           perms.canViewApInsights
@@ -264,7 +264,11 @@ export default function DashboardFeed({
             <View style={styles.chips}>
               {actions.map((action) => (
                 <TouchableOpacity key={action.key} style={styles.chip} onPress={action.onPress}>
-                  <Ionicons name={action.icon} size={16} color={colors.brand} />
+                  {action.key === "upload" ? (
+                    <Feather name="upload" size={16} color={colors.brand} />
+                  ) : (
+                    <Ionicons name={action.icon} size={16} color={colors.brand} />
+                  )}
                   <Text style={styles.chipLabel}>{action.label}</Text>
                 </TouchableOpacity>
               ))}

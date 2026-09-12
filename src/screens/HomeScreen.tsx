@@ -9,6 +9,7 @@ import HomeWelcomeCard from "../components/home/HomeWelcomeCard";
 import DashboardFeed from "../components/home/DashboardFeed";
 import CustomizeDashboardModal from "../components/home/CustomizeDashboardModal";
 import { useDashboardHome } from "../hooks/useDashboardHome";
+import { useUploadSource } from "../hooks/useUploadSourceMenu";
 import { radius, space, useAppTheme, useThemedStyles, type ThemeTokens } from "../theme";
 
 export default function HomeScreen({ navigation }: HomeScreenProps) {
@@ -17,6 +18,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
   const { colors } = useAppTheme();
   const styles = useThemedStyles(createStyles);
   const [customizeOpen, setCustomizeOpen] = useState(false);
+  const uploadSource = useUploadSource();
 
   return (
     <Screen edges={[]}>
@@ -77,7 +79,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
                 navigation.navigate("Reports");
               },
               openQueue: () => navigation.navigate("Queue"),
-              openScanner: () => navigation.navigate("Scanner"),
+              openUpload: uploadSource.open,
               openApDocument: (documentId) => navigation.navigate("ApDocument", { documentId }),
             }}
           />

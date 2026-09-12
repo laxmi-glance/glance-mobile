@@ -1,26 +1,24 @@
 import React, { useEffect } from "react";
-import { Alert, Platform, StyleSheet, TouchableOpacity, View } from "react-native";
-import { BottomTabNavigationProp, createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { CompositeNavigationProp, useNavigation } from "@react-navigation/native";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { Platform, StyleSheet, TouchableOpacity, View } from "react-native";
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import { MainTabParamList, RootStackParamList } from "../types/navigation";
+import { Feather, Ionicons } from "@expo/vector-icons";
+import { MainTabParamList } from "../types/navigation";
 import HomeScreen from "../screens/HomeScreen";
 import ApListScreen from "../screens/ApListScreen";
 import ReportsListScreen from "../screens/ReportsListScreen";
 import MoreScreen from "../screens/MoreScreen";
 import { fonts, makeShadow, navigationFonts, useAppTheme } from "../theme";
 import type { IconName } from "../config/features";
-import ScanIcon from "../components/ScanIcon";
-import { useRbac } from "../hooks/useRbac";
+import { UploadSourceProvider } from "../components/UploadSourceMenu";
+import { useUploadSource } from "../hooks/useUploadSourceMenu";
 import { useUnreadCount } from "../hooks/useUnreadCount";
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
-const SCAN_GOLD = "#D4AF37";
+const UPLOAD_GOLD = "#D4AF37";
 const TAB_BAR_BASE_HEIGHT = 64;
-const SCAN_SIZE = 58;
-const SCAN_HALO = 76;
+const UPLOAD_SIZE = 58;
+const UPLOAD_HALO = 76;
 
 function TabBarIcon({
   color,
@@ -36,41 +34,29 @@ function TabBarIcon({
   return <Ionicons name={focused ? active : idle} size={22} color={color} />;
 }
 
-function ScanPlaceholder() {
+function UploadPlaceholder() {
   return <View />;
 }
 
-function ScanTabButton() {
+function UploadTabButton() {
   const { colors } = useAppTheme();
-  const { canUpload, loading } = useRbac();
-  const navigation =
-    useNavigation<
-      CompositeNavigationProp<
-        BottomTabNavigationProp<MainTabParamList>,
-        NativeStackNavigationProp<RootStackParamList>
-      >
-    >();
+  const { visible, toggle } = useUploadSource();
 
   return (
     <TouchableOpacity
-      onPress={() => {
-        if (loading) {
-          return;
-        }
-        if (!canUpload) {
-          Alert.alert("Upload not allowed", "Your role cannot upload documents in this workspace.");
-          return;
-        }
-        navigation.navigate("Scanner");
-      }}
-      style={styles.scanWrap}
+      onPress={toggle}
+      style={styles.uploadWrap}
       activeOpacity={0.85}
       accessibilityRole="button"
-      accessibilityLabel="Scan document"
+      accessibilityLabel={visible ? "Close upload options" : "Upload document"}
     >
-      <View style={[styles.scanHalo, { backgroundColor: colors.background }]}>
-        <View style={[styles.scanBtn, { backgroundColor: colors.white }]}>
-          <ScanIcon size={30} />
+      <View style={[styles.uploadHalo, { backgroundColor: colors.background }]}>
+        <View style={[styles.uploadBtn, { backgroundColor: colors.white }]}>
+          {visible ? (
+            <Ionicons name="close" size={28} color={colors.brandNavy} />
+          ) : (
+            <Feather name="upload" size={26} color={colors.brandNavy} />
+          )}
         </View>
       </View>
     </TouchableOpacity>
@@ -82,14 +68,46 @@ export default function MainTabs() {
   const { colors, isDark, hydrateFromServer } = useAppTheme();
   const bottomPad = Math.max(insets.bottom, 10);
   const unread = useUnreadCount();
-  const moreBadge = unread > 0 ? (unread > 99 ? "99+" : unread) : undefined;
+  const moreBadge = unread > 0 ? (unread > 99 ? "99+" : String(unread)) : undefined;
 
   useEffect(() => {
     void hydrateFromServer();
   }, [hydrateFromServer]);
 
   return (
+    <UploadSourceProvider bottomOffset={TAB_BAR_BASE_HEIGHT + bottomPad + UPLOAD_HALO / 2 + 8}>
+      <MainTabNavigator
+        colors={colors}
+        isDark={isDark}
+        bottomPad={bottomPad}
+        moreBadge={moreBadge}
+      />
+    </UploadSourceProvider>
+  );
+}
+
+function MainTabNavigator({
+  colors,
+  isDark,
+  bottomPad,
+  moreBadge,
+}: {
+  colors: ReturnType<typeof useAppTheme>["colors"];
+  isDark: boolean;
+  bottomPad: number;
+  moreBadge: string | undefined;
+}) {
+  const { hide } = useUploadSource();
+
+  return (
     <Tab.Navigator
+      screenListeners={({ route }) => ({
+        focus: () => {
+          if (route.name !== "Upload") {
+            hide();
+          }
+        },
+      })}
       screenOptions={{
         headerShown: false,
         tabBarHideOnKeyboard: true,
@@ -134,12 +152,12 @@ export default function MainTabs() {
         }}
       />
       <Tab.Screen
-        name="Scan"
-        component={ScanPlaceholder}
+        name="Upload"
+        component={UploadPlaceholder}
         options={{
-          title: "Scan",
+          title: "Upload",
           tabBarLabel: () => null,
-          tabBarButton: () => <ScanTabButton />,
+          tabBarButton: () => <UploadTabButton />,
         }}
         listeners={{
           tabPress: (event) => {
@@ -196,26 +214,26 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bold,
     lineHeight: 14,
   },
-  scanWrap: {
+  uploadWrap: {
     flex: 1,
     alignItems: "center",
     justifyContent: "flex-start",
-    top: -(SCAN_HALO / 2),
+    top: -(UPLOAD_HALO / 2),
     overflow: "visible",
   },
-  scanHalo: {
-    width: SCAN_HALO,
-    height: SCAN_HALO,
-    borderRadius: SCAN_HALO / 2,
+  uploadHalo: {
+    width: UPLOAD_HALO,
+    height: UPLOAD_HALO,
+    borderRadius: UPLOAD_HALO / 2,
     alignItems: "center",
     justifyContent: "center",
   },
-  scanBtn: {
-    width: SCAN_SIZE,
-    height: SCAN_SIZE,
-    borderRadius: SCAN_SIZE / 2,
+  uploadBtn: {
+    width: UPLOAD_SIZE,
+    height: UPLOAD_SIZE,
+    borderRadius: UPLOAD_SIZE / 2,
     borderWidth: 2,
-    borderColor: SCAN_GOLD,
+    borderColor: UPLOAD_GOLD,
     alignItems: "center",
     justifyContent: "center",
     ...Platform.select({

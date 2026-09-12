@@ -10,7 +10,7 @@ export type AppFeature = {
   subtitle: string;
   icon: IconName;
   available: boolean;
-  tab?: Exclude<keyof MainTabParamList, "Scan">;
+  tab?: Exclude<keyof MainTabParamList, "Upload">;
   stack?: keyof RootStackParamList;
 };
 
