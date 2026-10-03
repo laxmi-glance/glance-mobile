@@ -249,6 +249,14 @@ export default function MoreScreen({ navigation }: MoreScreenProps) {
           onPress={handleSwitchWorkspace}
         />
 
+        <Text style={styles.section}>Accounting</Text>
+        <ListRow
+          icon="book-outline"
+          label="Accounting"
+          subtitle="Chart of accounts and general ledger"
+          onPress={() => navigation.navigate("Accounting")}
+        />
+
         <Text style={styles.section}>Appearance</Text>
         <ThemePicker />
 

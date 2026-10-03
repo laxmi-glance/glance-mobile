@@ -81,6 +81,9 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
               openQueue: () => navigation.navigate("Queue"),
               openUpload: uploadSource.open,
               openApDocument: (documentId) => navigation.navigate("ApDocument", { documentId }),
+              openAccounting: () => navigation.navigate("Accounting"),
+              openGeneralLedger: () => navigation.navigate("GeneralLedger"),
+              openJournalEntry: (entryId) => navigation.navigate("JournalEntry", { entryId }),
             }}
           />
         )}

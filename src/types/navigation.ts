@@ -13,6 +13,11 @@ export type RootStackParamList = {
   Queue: undefined;
   Scanner: undefined;
   Report: { reportId: string };
+  Accounting: undefined;
+  ChartOfAccounts: undefined;
+  LedgerAccount: { accountId: string; title?: string };
+  GeneralLedger: undefined;
+  JournalEntry: { entryId: string };
 };
 
 export type MainTabParamList = {
@@ -38,6 +43,14 @@ export type NotificationsStackProps = NativeStackScreenProps<RootStackParamList,
 export type QueueScreenProps = NativeStackScreenProps<RootStackParamList, "Queue">;
 export type ScannerScreenProps = NativeStackScreenProps<RootStackParamList, "Scanner">;
 export type ReportScreenProps = NativeStackScreenProps<RootStackParamList, "Report">;
+export type AccountingScreenProps = NativeStackScreenProps<RootStackParamList, "Accounting">;
+export type ChartOfAccountsScreenProps = NativeStackScreenProps<
+  RootStackParamList,
+  "ChartOfAccounts"
+>;
+export type LedgerAccountScreenProps = NativeStackScreenProps<RootStackParamList, "LedgerAccount">;
+export type GeneralLedgerScreenProps = NativeStackScreenProps<RootStackParamList, "GeneralLedger">;
+export type JournalEntryScreenProps = NativeStackScreenProps<RootStackParamList, "JournalEntry">;
 
 export type HomeScreenProps = CompositeScreenProps<
   BottomTabScreenProps<MainTabParamList, "Home">,
