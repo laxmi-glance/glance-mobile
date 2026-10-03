@@ -8,6 +8,7 @@ export const DOC_PROCESSING_ROLES = [
   "standard_user",
   "auditor",
   "sales_manager",
+  "mis_reporter",
 ];
 
 export const DASHBOARD_PERIODS: { value: DashboardPeriod; label: string }[] = [
@@ -101,48 +102,32 @@ export const LAYOUT_SECTIONS: Record<DashboardLayoutKey, DashboardSectionId[]> =
     "ledger",
     "team",
   ]),
-  operator: withMobileCore(["actionInbox", "quickActions", "currencyConverter", "tdsCalculator"]),
-  sales: withMobileCore([
+  operator: withMobileCore(["actionInbox", "quickActions"]),
+  sales: withMobileCore(["actionInbox", "quickActions", "inventorySummary", "topCustomers"]),
+  analytics: withMobileCore([
     "actionInbox",
-    "quickActions",
     "plSnapshot",
-    "cashPosition",
     "balanceSheet",
     "cashFlowTrend",
     "priorYearBenchmark",
     "workingCapital",
+    "compliance",
+    "tdsSummary",
     "topVendors",
     "topCustomers",
-    "currencyConverter",
-    "tdsCalculator",
-    "aiAccuracy",
   ]),
-  analytics: withMobileCore([
-    "actionInbox",
-    "plSnapshot",
+  auditor: [
     "cashPosition",
+    "plSnapshot",
     "balanceSheet",
     "cashFlowTrend",
     "priorYearBenchmark",
+    "workingCapital",
+    "compliance",
+    "tdsSummary",
     "topVendors",
     "topCustomers",
-    "aiAccuracy",
-    "team",
-  ]),
-  auditor: withMobileCore([
-    "actionInbox",
-    "cashPosition",
-    "plSnapshot",
-    "bankReconciliation",
-    "balanceSheet",
-    "cashFlowTrend",
-    "priorYearBenchmark",
-    "topVendors",
-    "topCustomers",
-    "aiAccuracy",
-    "sync",
-    "ledger",
-  ]),
+  ],
 };
 
 export const SECTION_LABELS: Record<string, string> = {

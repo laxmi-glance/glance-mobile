@@ -104,6 +104,9 @@ export function useDashboardHome() {
         rbacAllows(rbac.config, rbac.role, "financial_document", "view_all"),
       canAccessDocProcessing: DOC_PROCESSING_ROLES.includes(role),
       canViewTds: rbacAllows(rbac.config, rbac.role, "tds", "view"),
+      canViewFinancialDashboard:
+        rbacAllows(rbac.config, rbac.role, "dashboard", "view_full") ||
+        rbacAllows(rbac.config, rbac.role, "dashboard", "view_financial"),
     };
   }, [rbac.role, rbac.canApprove, rbac.canUpload, rbac.canViewAp, rbac.config]);
 
@@ -215,7 +218,10 @@ export function useDashboardHome() {
             .catch(() => assign("balanceSheet", { loading: false, data: null }))
         );
       }
-      if (visible.has("cashFlowTrend") && perms.canViewBanking) {
+      if (
+        visible.has("cashFlowTrend") &&
+        (perms.canViewBanking || perms.canViewFinancialDashboard)
+      ) {
         tasks.push(
           dashboardService
             .getCashFlowTrend()
@@ -234,7 +240,7 @@ export function useDashboardHome() {
             .catch(() => assign("workingCapital", { loading: false, data: null }))
         );
       }
-      if (visible.has("compliance") && ["owner", "admin", "accountant"].includes(perms.role)) {
+      if (visible.has("compliance") && perms.canViewFinancialDashboard) {
         tasks.push(
           dashboardService
             .getComplianceEvents()
@@ -242,7 +248,7 @@ export function useDashboardHome() {
             .catch(() => assign("complianceEvents", { loading: false, data: [] }))
         );
       }
-      if (visible.has("tdsSummary") && perms.canViewTds) {
+      if (visible.has("tdsSummary") && (perms.canViewTds || perms.canViewFinancialDashboard)) {
         tasks.push(
           dashboardService
             .getTdsSummary(activePeriod)
