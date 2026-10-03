@@ -16,6 +16,7 @@ const POLL_MS = 1500;
 type StartResponse = {
   session_id: string;
   session_secret: string;
+  user_code: string;
   login_path: string;
 };
 
@@ -47,6 +48,7 @@ export default function WebAuthLoginScreen({ navigation }: WebAuthLoginScreenPro
   const sessionRef = useRef<StartResponse | null>(null);
   const [statusText, setStatusText] = useState("Opening your browser...");
   const [loginPath, setLoginPath] = useState<string | null>(null);
+  const [userCode, setUserCode] = useState<string>("");
 
   const finishSuccess = useCallback(
     async (data: LoginResponse) => {
@@ -144,6 +146,7 @@ export default function WebAuthLoginScreen({ navigation }: WebAuthLoginScreenPro
         return;
       }
       setLoginPath(null);
+      setUserCode("");
       setStatusText("Opening your browser...");
       let started: StartResponse | null = null;
       try {
@@ -156,6 +159,7 @@ export default function WebAuthLoginScreen({ navigation }: WebAuthLoginScreenPro
         }
         started = data;
         sessionRef.current = data;
+        setUserCode(typeof data.user_code === "string" ? data.user_code : "");
         await openBrowser(data.login_path);
         if (cancelled || generation !== startGeneration) {
           if (sessionRef.current === data) {
@@ -237,6 +241,15 @@ export default function WebAuthLoginScreen({ navigation }: WebAuthLoginScreenPro
       <View style={styles.body}>
         <Text style={styles.title}>Waiting for browser sign-in</Text>
         <Text style={styles.lead}>{statusText}</Text>
+        {userCode ? (
+          <View style={styles.codeBox}>
+            <Text style={styles.codeLabel}>Enter this code in the browser</Text>
+            <Text style={styles.code} selectable>
+              {userCode}
+            </Text>
+            <Text style={styles.codeHint}>Only enter it if you started this sign-in.</Text>
+          </View>
+        ) : null}
         {loginPath ? (
           <Button
             label="Open browser again"
@@ -291,6 +304,28 @@ function createStyles({ colors, type }: ThemeTokens) {
       ...type.callout,
       color: colors.textSecondary,
       marginBottom: 24,
+    },
+    codeBox: {
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 8,
+      padding: 16,
+      marginBottom: 24,
+    },
+    codeLabel: {
+      ...type.callout,
+      color: colors.textSecondary,
+    },
+    code: {
+      ...type.title,
+      color: colors.textHeading,
+      letterSpacing: 4,
+      marginVertical: 8,
+    },
+    codeHint: {
+      ...type.callout,
+      color: colors.textSecondary,
     },
   } as const;
 }
