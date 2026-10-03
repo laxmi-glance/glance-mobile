@@ -55,6 +55,7 @@ export type DashboardPerms = {
   canViewArInsights: boolean;
   canAccessDocProcessing: boolean;
   canViewTds: boolean;
+  canViewFinancialDashboard: boolean;
 };
 
 export type ActionItem = {
