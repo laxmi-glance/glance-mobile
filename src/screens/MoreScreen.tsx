@@ -241,6 +241,14 @@ export default function MoreScreen({ navigation }: MoreScreenProps) {
           </View>
         </View>
 
+        <Text style={styles.section}>Workspace</Text>
+        <ListRow
+          icon="swap-horizontal-outline"
+          label="Switch workspace"
+          subtitle={tenant?.company_name}
+          onPress={handleSwitchWorkspace}
+        />
+
         <Text style={styles.section}>Appearance</Text>
         <ThemePicker />
 
@@ -267,20 +275,6 @@ export default function MoreScreen({ navigation }: MoreScreenProps) {
               accessibilityLabel="Biometric unlock"
             />
           }
-        />
-
-        <Text style={styles.section}>Workspace</Text>
-        <ListRow
-          icon="swap-horizontal-outline"
-          label="Switch workspace"
-          subtitle={tenant?.company_name}
-          onPress={handleSwitchWorkspace}
-        />
-        <ListRow
-          icon="open-outline"
-          label="Open web app"
-          subtitle="Full accounting workspace"
-          onPress={() => Linking.openURL(FRONTEND_URL)}
         />
 
         <Text style={styles.section}>Coming next</Text>
