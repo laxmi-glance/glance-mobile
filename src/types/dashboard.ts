@@ -199,4 +199,11 @@ export type DashboardSecondary = {
     timestamp?: string;
     read?: boolean;
   }>;
+  errorNotifications: AsyncList<{
+    id: string;
+    title?: string;
+    message?: string;
+    timestamp?: string;
+    read?: boolean;
+  }>;
 };

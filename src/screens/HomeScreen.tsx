@@ -68,8 +68,11 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
             periodLabel={home.periodLabel}
             loading={home.loading}
             unread={home.unread}
+            unreadErrors={home.unreadErrors}
             navigation={{
-              openNotifications: () => navigation.navigate("Notifications"),
+              openNotifications: () =>
+                navigation.navigate("Notifications", { panel: "notifications" }),
+              openErrors: () => navigation.navigate("Notifications", { panel: "errors" }),
               openDocuments: () => navigation.navigate("AP"),
               openReports: (reportId) => {
                 if (reportId) {

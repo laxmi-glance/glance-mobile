@@ -3,20 +3,39 @@ import { useFocusEffect } from "@react-navigation/native";
 import notificationService from "../services/notification.service";
 
 const DEFAULT_INTERVAL_MS = 60000;
-const listeners = new Set<(count: number) => void>();
-let current = 0;
-let inFlight: Promise<number> | null = null;
+
+export type UnreadCounts = {
+  total: number;
+  errors: number;
+  general: number;
+};
+
+const EMPTY: UnreadCounts = { total: 0, errors: 0, general: 0 };
+const listeners = new Set<(counts: UnreadCounts) => void>();
+let current: UnreadCounts = EMPTY;
+let inFlight: Promise<UnreadCounts> | null = null;
 let timer: ReturnType<typeof setInterval> | null = null;
 let subscriberCount = 0;
 
-async function fetchUnread(): Promise<number> {
+function toCounts(total: number, errors: number): UnreadCounts {
+  const safeTotal = Math.max(0, total);
+  const safeErrors = Math.min(Math.max(0, errors), safeTotal);
+  return { total: safeTotal, errors: safeErrors, general: safeTotal - safeErrors };
+}
+
+function publish(counts: UnreadCounts) {
+  current = counts;
+  listeners.forEach((listener) => listener(counts));
+}
+
+export function refreshUnreadCounts(): Promise<UnreadCounts> {
   if (!inFlight) {
     inFlight = notificationService
-      .unreadCount()
-      .then((count) => {
-        current = count;
-        listeners.forEach((listener) => listener(count));
-        return count;
+      .unreadCounts()
+      .then(({ total, errors }) => {
+        const counts = toCounts(total, errors);
+        publish(counts);
+        return counts;
       })
       .catch(() => current)
       .finally(() => {
@@ -31,18 +50,18 @@ function ensureTimer(intervalMs: number) {
     return;
   }
   timer = setInterval(() => {
-    void fetchUnread();
+    void refreshUnreadCounts();
   }, intervalMs);
 }
 
-export function useUnreadCount(intervalMs = DEFAULT_INTERVAL_MS) {
-  const [unread, setUnread] = useState(current);
+export function useUnreadCounts(intervalMs = DEFAULT_INTERVAL_MS) {
+  const [counts, setCounts] = useState(current);
 
   useEffect(() => {
-    const listener = (count: number) => setUnread(count);
+    const listener = (next: UnreadCounts) => setCounts(next);
     listeners.add(listener);
     subscriberCount += 1;
-    void fetchUnread();
+    void refreshUnreadCounts();
     ensureTimer(intervalMs);
     return () => {
       listeners.delete(listener);
@@ -56,9 +75,9 @@ export function useUnreadCount(intervalMs = DEFAULT_INTERVAL_MS) {
 
   useFocusEffect(
     useCallback(() => {
-      void fetchUnread();
+      void refreshUnreadCounts();
     }, [])
   );
 
-  return unread;
+  return counts;
 }

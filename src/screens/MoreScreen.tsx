@@ -38,7 +38,8 @@ import {
   useThemedStyles,
   type ThemeTokens,
 } from "../theme";
-import { useUnreadCount } from "../hooks/useUnreadCount";
+import { useUnreadCounts } from "../hooks/useUnreadCount";
+import { notificationHeaderShortcuts } from "../components/notificationHeaderShortcuts";
 import ThemePicker from "../components/ThemePicker";
 
 const PROFILE_WEB_URL = `${FRONTEND_URL.replace(/\/+$/, "")}/user/user-profile`;
@@ -57,7 +58,10 @@ function formatRole(role?: string | null) {
 }
 
 export default function MoreScreen({ navigation }: MoreScreenProps) {
-  const unread = useUnreadCount();
+  const unread = useUnreadCounts();
+  const openPanel = (panel: "notifications" | "errors") => {
+    navigation.navigate("Notifications", { panel });
+  };
   const { colors, setTheme, hydrateFromServer } = useAppTheme();
   const styles = useThemedStyles(createStyles);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -148,7 +152,12 @@ export default function MoreScreen({ navigation }: MoreScreenProps) {
   if (loading) {
     return (
       <Screen edges={[]}>
-        <PageHeader title="Account" subtitle="Profile and workspace" icon="person-circle-outline" />
+        <PageHeader
+          title="Account"
+          subtitle="Profile and workspace"
+          icon="person-circle-outline"
+          shortcuts={notificationHeaderShortcuts(unread, openPanel)}
+        />
         <View style={styles.center}>
           <ActivityIndicator size="large" color={colors.brand} />
         </View>
@@ -173,10 +182,7 @@ export default function MoreScreen({ navigation }: MoreScreenProps) {
         title="Account"
         subtitle="Profile and workspace"
         icon="person-circle-outline"
-        supportingIcon="notifications-outline"
-        supportingAccessibilityLabel="Notifications"
-        supportingBadge={unread}
-        onSupportingPress={() => navigation.navigate("Notifications")}
+        shortcuts={notificationHeaderShortcuts(unread, openPanel)}
       />
 
       <ScrollView contentContainerStyle={styles.content}>

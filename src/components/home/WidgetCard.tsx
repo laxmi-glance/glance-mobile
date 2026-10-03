@@ -14,12 +14,22 @@ import type { IconName } from "../../config/features";
 type Props = {
   title: string;
   icon?: IconName;
+  iconColor?: string;
+  iconBackground?: string;
   extra?: ReactNode;
   children: ReactNode;
   onPress?: () => void;
 };
 
-export default function WidgetCard({ title, icon, extra, children, onPress }: Props) {
+export default function WidgetCard({
+  title,
+  icon,
+  iconColor,
+  iconBackground,
+  extra,
+  children,
+  onPress,
+}: Props) {
   const { colors } = useAppTheme();
   const styles = useThemedStyles(createStyles);
   const body = (
@@ -27,8 +37,10 @@ export default function WidgetCard({ title, icon, extra, children, onPress }: Pr
       <View style={styles.header}>
         <View style={styles.titleRow}>
           {icon ? (
-            <View style={styles.iconWrap}>
-              <Ionicons name={icon} size={16} color={colors.brand} />
+            <View
+              style={[styles.iconWrap, iconBackground ? { backgroundColor: iconBackground } : null]}
+            >
+              <Ionicons name={icon} size={16} color={iconColor || colors.brand} />
             </View>
           ) : null}
           <Text style={styles.title} numberOfLines={1}>

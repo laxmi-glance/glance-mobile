@@ -15,7 +15,7 @@ import preferencesService from "../services/preferences.service";
 import tenantService from "../services/tenant.service";
 import { useAppTheme } from "../theme";
 import { useRbac } from "./useRbac";
-import { useUnreadCount } from "./useUnreadCount";
+import { useUnreadCounts } from "./useUnreadCount";
 import {
   getVisibleSections,
   isDefaultLayoutConfig,
@@ -24,6 +24,7 @@ import {
 import { getDisplayFirstName, getGreeting } from "../utils/greeting";
 import { rbacAllows } from "../utils/rbac";
 import notificationService from "../services/notification.service";
+import { isInErrorsTab, isInGeneralTab } from "../utils/notificationKind";
 import type {
   CompleteDashboard,
   DashboardPeriod,
@@ -58,6 +59,7 @@ const emptySecondary = (): DashboardSecondary => ({
   recentJE: { ...idleList },
   erpSync: { ...idleValue },
   notifications: { ...idleList },
+  errorNotifications: { ...idleList },
 });
 
 function isPeriod(value: string | null): value is DashboardPeriod {
@@ -66,7 +68,7 @@ function isPeriod(value: string | null): value is DashboardPeriod {
 
 export function useDashboardHome() {
   const rbac = useRbac();
-  const unread = useUnreadCount();
+  const unreadCounts = useUnreadCounts();
   const { applyFromPreferences, getThemeWriteEpoch } = useAppTheme();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [companyName, setCompanyName] = useState("Workspace");
@@ -331,11 +333,25 @@ export function useDashboardHome() {
       if (visible.has("notifications")) {
         tasks.push(
           notificationService
-            .list(1)
+            .list(1, "notifications")
             .then((data) =>
-              assign("notifications", { loading: false, data: (data.results || []).slice(0, 5) })
+              assign("notifications", {
+                loading: false,
+                data: (data.results || []).filter(isInGeneralTab).slice(0, 5),
+              })
             )
             .catch(() => assign("notifications", { loading: false, data: [] }))
+        );
+        tasks.push(
+          notificationService
+            .list(1, "errors")
+            .then((data) =>
+              assign("errorNotifications", {
+                loading: false,
+                data: (data.results || []).filter(isInErrorsTab).slice(0, 5),
+              })
+            )
+            .catch(() => assign("errorNotifications", { loading: false, data: [] }))
         );
       }
 
@@ -431,7 +447,8 @@ export function useDashboardHome() {
     companyName,
     logoUri,
     greeting,
-    unread,
+    unread: unreadCounts.general,
+    unreadErrors: unreadCounts.errors,
     period,
     periodLabel: getPeriodLabel(period),
     cyclePeriod,

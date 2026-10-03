@@ -9,7 +9,7 @@ export type RootStackParamList = {
   Main: undefined;
   DocumentDetail: { documentId: string };
   ApDocument: { documentId: string };
-  Notifications: undefined;
+  Notifications: { panel?: "notifications" | "errors" } | undefined;
   Queue: undefined;
   Scanner: undefined;
   Report: { reportId: string };
