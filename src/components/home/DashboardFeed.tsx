@@ -10,6 +10,7 @@ import {
 } from "../../config/dashboard";
 import { formatDate, formatDateTime } from "../../utils/dates";
 import { formatInr } from "../../utils/money";
+import { postingStatusLabel } from "../../utils/accounting";
 import { radius, space, useAppTheme, useThemedStyles, type ThemeTokens } from "../../theme";
 import type { CompleteDashboard, DashboardPerms, DashboardSecondary } from "../../types/dashboard";
 import WidgetCard, { WidgetEmpty, WidgetSkeleton } from "./WidgetCard";
@@ -23,6 +24,9 @@ export type HomeNavigation = {
   openQueue: () => void;
   openUpload: () => void;
   openApDocument: (id: string) => void;
+  openAccounting: () => void;
+  openGeneralLedger: () => void;
+  openJournalEntry: (entryId: string) => void;
 };
 
 type Props = {
@@ -275,6 +279,14 @@ export default function DashboardFeed({
                 label: "P&L",
                 icon: "bar-chart-outline" as IconName,
                 onPress: () => navigation.openReports("profit-and-loss"),
+              }
+            : null,
+          perms.canViewGlList || perms.canViewGl
+            ? {
+                key: "accounting",
+                label: "Accounting",
+                icon: "book-outline" as IconName,
+                onPress: navigation.openAccounting,
               }
             : null,
           perms.canAccessDocProcessing
@@ -804,23 +816,57 @@ export default function DashboardFeed({
         }
         const entries = secondary.recentJE.data;
         return (
-          <WidgetCard title="Recent journal entries" icon="book-outline">
+          <WidgetCard
+            title="Recent journal entries"
+            icon="book-outline"
+            extra={
+              perms.canViewGl ? (
+                <TouchableOpacity
+                  onPress={navigation.openGeneralLedger}
+                  accessibilityRole="button"
+                  accessibilityLabel="Open general ledger"
+                >
+                  <Text style={styles.linkText}>See all</Text>
+                </TouchableOpacity>
+              ) : null
+            }
+          >
             {entries.length === 0 ? (
               <WidgetEmpty text="No recent journal entries." />
             ) : (
-              entries.map((entry) => (
-                <View key={entry.id} style={styles.listRow}>
-                  <View style={styles.listCopy}>
-                    <Text style={styles.listTitle} numberOfLines={1}>
-                      {entry.voucher_number || "Journal"}
-                    </Text>
-                    <Text style={styles.listMeta} numberOfLines={1}>
-                      {formatDate(entry.date)} · {entry.post_status || "draft"}
-                    </Text>
-                  </View>
-                  <Text style={styles.listAmount}>{formatInr(entry.total_debit, true)}</Text>
-                </View>
-              ))
+              entries.map((entry) => {
+                const body = (
+                  <>
+                    <View style={styles.listCopy}>
+                      <Text style={styles.listTitle} numberOfLines={1}>
+                        {entry.voucher_number || "Journal"}
+                      </Text>
+                      <Text style={styles.listMeta} numberOfLines={1}>
+                        {formatDate(entry.date)} · {postingStatusLabel(entry.post_status)}
+                      </Text>
+                    </View>
+                    <Text style={styles.listAmount}>{formatInr(entry.total_debit, true)}</Text>
+                  </>
+                );
+                if (!perms.canViewGl) {
+                  return (
+                    <View key={entry.id} style={styles.listRow}>
+                      {body}
+                    </View>
+                  );
+                }
+                return (
+                  <TouchableOpacity
+                    key={entry.id}
+                    style={styles.listRow}
+                    onPress={() => navigation.openJournalEntry(entry.id)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Open journal ${entry.voucher_number || "entry"}`}
+                  >
+                    {body}
+                  </TouchableOpacity>
+                );
+              })
             )}
           </WidgetCard>
         );

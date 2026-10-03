@@ -100,6 +100,7 @@ export function useDashboardHome() {
       canViewStatutoryReports: rbacAllows(rbac.config, rbac.role, "reports", "view"),
       canViewBanking: rbacAllows(rbac.config, rbac.role, "bank", "view"),
       canViewGlList: rbacAllows(rbac.config, rbac.role, "ledger", "view"),
+      canViewGl: rbacAllows(rbac.config, rbac.role, "gl", "view"),
       canViewApInsights: rbac.canViewAp,
       canViewArInsights:
         rbacAllows(rbac.config, rbac.role, "financial_document", "view_team") ||

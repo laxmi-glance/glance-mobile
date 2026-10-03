@@ -51,6 +51,7 @@ export type DashboardPerms = {
   canViewStatutoryReports: boolean;
   canViewBanking: boolean;
   canViewGlList: boolean;
+  canViewGl: boolean;
   canViewApInsights: boolean;
   canViewArInsights: boolean;
   canAccessDocProcessing: boolean;
