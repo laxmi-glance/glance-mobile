@@ -17,10 +17,54 @@ import { apiErrorMessage } from "../utils/errors";
 import Screen from "../components/Screen";
 import PageHeader from "../components/PageHeader";
 import EmptyState from "../components/EmptyState";
+import { notificationHeaderShortcuts } from "../components/notificationHeaderShortcuts";
+import { refreshUnreadCounts, useUnreadCounts } from "../hooks/useUnreadCount";
 import { mergeUniqueById } from "../utils/lists";
+import { isNotificationPanel, type NotificationPanel } from "../utils/notificationKind";
 import { radius, space, useAppTheme, useThemedStyles, type ThemeTokens } from "../theme";
 
-export default function NotificationsScreen({ navigation }: NotificationsScreenProps) {
+const PANEL_COPY: Record<
+  NotificationPanel,
+  {
+    title: string;
+    subtitle: string;
+    icon: "notifications-outline" | "alert-circle-outline";
+    empty: string;
+    hint: string;
+  }
+> = {
+  notifications: {
+    title: "Notifications",
+    subtitle: "Approvals, updates, and mentions",
+    icon: "notifications-outline",
+    empty: "You are all caught up.",
+    hint: "Approvals and other updates will show here.",
+  },
+  errors: {
+    title: "Errors",
+    subtitle: "Failures and data integrity",
+    icon: "alert-circle-outline",
+    empty: "No errors",
+    hint: "Data integrity and failure alerts will show here.",
+  },
+};
+
+export default function NotificationsScreen({ navigation, route }: NotificationsScreenProps) {
+  const panel: NotificationPanel = isNotificationPanel(route.params?.panel)
+    ? route.params.panel
+    : "notifications";
+  return <NotificationPanelView key={panel} panel={panel} navigation={navigation} />;
+}
+
+function NotificationPanelView({
+  panel,
+  navigation,
+}: {
+  panel: NotificationPanel;
+  navigation: NotificationsScreenProps["navigation"];
+}) {
+  const copy = PANEL_COPY[panel];
+  const unread = useUnreadCounts();
   const { colors } = useAppTheme();
   const styles = useThemedStyles(createStyles);
   const [items, setItems] = useState<AppNotification[]>([]);
@@ -32,38 +76,44 @@ export default function NotificationsScreen({ navigation }: NotificationsScreenP
   const fetchGen = useRef(0);
   const loadingMoreRef = useRef(false);
 
-  const load = useCallback(async (pageNum = 1, replace = false) => {
-    const isReplace = replace || pageNum === 1;
-    if (isReplace) {
-      fetchGen.current += 1;
-    }
-    const gen = fetchGen.current;
-    try {
-      const data = await notificationService.list(pageNum);
-      if (gen !== fetchGen.current) {
-        return;
+  const load = useCallback(
+    async (pageNum = 1, replace = false) => {
+      const isReplace = replace || pageNum === 1;
+      if (isReplace) {
+        fetchGen.current += 1;
       }
-      setItems((prev) => mergeUniqueById(prev, data.results, replace || pageNum === 1));
-      setHasMore(Boolean(data.next));
-      setPage(pageNum);
-    } catch (error: unknown) {
-      if (gen !== fetchGen.current) {
-        return;
+      const gen = fetchGen.current;
+      try {
+        const data = await notificationService.list(pageNum, panel);
+        if (gen !== fetchGen.current) {
+          return;
+        }
+        setItems((prev) => mergeUniqueById(prev, data.results, replace || pageNum === 1));
+        setHasMore(Boolean(data.next));
+        setPage(pageNum);
+      } catch (error: unknown) {
+        if (gen !== fetchGen.current) {
+          return;
+        }
+        Alert.alert(
+          panel === "errors" ? "Could not load errors" : "Could not load notifications",
+          apiErrorMessage(error)
+        );
+      } finally {
+        if (gen !== fetchGen.current) {
+          return;
+        }
+        loadingMoreRef.current = false;
+        setLoading(false);
+        setRefreshing(false);
+        setLoadingMore(false);
       }
-      Alert.alert("Could not load notifications", apiErrorMessage(error));
-    } finally {
-      if (gen !== fetchGen.current) {
-        return;
-      }
-      loadingMoreRef.current = false;
-      setLoading(false);
-      setRefreshing(false);
-      setLoadingMore(false);
-    }
-  }, []);
+    },
+    [panel]
+  );
 
   useEffect(() => {
-    void load(1, true); // eslint-disable-line react-hooks/set-state-in-effect -- load notifications after async API call
+    void load(1, true); // eslint-disable-line react-hooks/set-state-in-effect -- load this panel after the async API call
   }, [load]);
 
   const onRefresh = useCallback(() => {
@@ -73,8 +123,9 @@ export default function NotificationsScreen({ navigation }: NotificationsScreenP
 
   const handleMarkAll = async () => {
     try {
-      await notificationService.markAllRead();
-      load(1, true);
+      await notificationService.markPanelRead(panel);
+      await refreshUnreadCounts();
+      void load(1, true);
     } catch (error: unknown) {
       Alert.alert("Could not update", apiErrorMessage(error));
     }
@@ -85,20 +136,25 @@ export default function NotificationsScreen({ navigation }: NotificationsScreenP
       try {
         await notificationService.markRead(item.id);
         setItems((prev) => prev.map((row) => (row.id === item.id ? { ...row, read: true } : row)));
+        void refreshUnreadCounts();
       } catch {
         // Non-fatal: still show the message.
       }
     }
-    Alert.alert(item.title || "Notification", item.message);
+    Alert.alert(item.title || copy.title, item.message);
   };
 
   const renderItem = ({ item }: { item: AppNotification }) => (
     <TouchableOpacity
-      style={[styles.card, !item.read && styles.unread]}
+      style={[styles.card, !item.read && (panel === "errors" ? styles.unreadError : styles.unread)]}
       onPress={() => handlePress(item)}
       activeOpacity={0.8}
     >
-      {!item.read ? <View style={styles.dot} /> : <View style={styles.dotSpacer} />}
+      {!item.read ? (
+        <View style={[styles.dot, panel === "errors" && styles.dotError]} />
+      ) : (
+        <View style={styles.dotSpacer} />
+      )}
       <View style={styles.body}>
         <Text style={styles.title}>{item.title}</Text>
         <Text style={styles.message} numberOfLines={3}>
@@ -112,11 +168,17 @@ export default function NotificationsScreen({ navigation }: NotificationsScreenP
   return (
     <Screen edges={["bottom"]}>
       <PageHeader
-        title="Notifications"
-        subtitle="Approvals, failures, and mentions"
-        icon="notifications-outline"
+        title={copy.title}
+        subtitle={copy.subtitle}
+        icon={copy.icon}
+        iconColor={panel === "errors" ? colors.danger : colors.brand}
         showBack={navigation.canGoBack()}
         onBack={() => navigation.goBack()}
+        shortcuts={notificationHeaderShortcuts(
+          unread,
+          (next) => navigation.setParams({ panel: next }),
+          panel
+        )}
         menuActions={[
           { key: "refresh", label: "Refresh", onPress: onRefresh },
           { key: "mark-all", label: "Mark all read", onPress: () => void handleMarkAll() },
@@ -140,15 +202,16 @@ export default function NotificationsScreen({ navigation }: NotificationsScreenP
         onEndReachedThreshold={0.4}
         ListFooterComponent={loadingMore ? <ActivityIndicator style={styles.footer} /> : null}
         ListEmptyComponent={
-          !loading ? (
-            <EmptyState icon="notifications-outline" title="You are all caught up." />
-          ) : null
+          !loading ? <EmptyState icon={copy.icon} title={copy.empty} hint={copy.hint} /> : null
         }
       />
 
       {loading ? (
         <View style={styles.overlay}>
-          <ActivityIndicator size="large" color={colors.brand} />
+          <ActivityIndicator
+            size="large"
+            color={panel === "errors" ? colors.danger : colors.brand}
+          />
         </View>
       ) : null}
     </Screen>
@@ -168,12 +231,16 @@ function createStyles({ colors, type }: ThemeTokens) {
       borderColor: colors.border,
       padding: space.lg,
       marginBottom: space.md,
-      flexDirection: "row",
+      flexDirection: "row" as const,
       gap: space.md,
     },
     unread: {
       borderColor: colors.brandSoft,
       backgroundColor: colors.surfaceMuted,
+    },
+    unreadError: {
+      borderColor: colors.dangerSoft,
+      backgroundColor: colors.dangerSoft,
     },
     dot: {
       width: 8,
@@ -181,6 +248,9 @@ function createStyles({ colors, type }: ThemeTokens) {
       borderRadius: 4,
       backgroundColor: colors.brand,
       marginTop: 6,
+    },
+    dotError: {
+      backgroundColor: colors.danger,
     },
     dotSpacer: {
       width: 8,
@@ -203,8 +273,8 @@ function createStyles({ colors, type }: ThemeTokens) {
     overlay: {
       ...StyleSheet.absoluteFill,
       backgroundColor: colors.overlay,
-      justifyContent: "center",
-      alignItems: "center",
+      justifyContent: "center" as const,
+      alignItems: "center" as const,
     },
     footer: {
       marginVertical: space.lg,

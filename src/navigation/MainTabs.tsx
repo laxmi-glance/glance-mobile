@@ -12,7 +12,7 @@ import { fonts, makeShadow, navigationFonts, useAppTheme } from "../theme";
 import type { IconName } from "../config/features";
 import { UploadSourceProvider } from "../components/UploadSourceMenu";
 import { useUploadSource } from "../hooks/useUploadSourceMenu";
-import { useUnreadCount } from "../hooks/useUnreadCount";
+import { useUnreadCounts } from "../hooks/useUnreadCount";
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const UPLOAD_GOLD = "#D4AF37";
@@ -67,7 +67,7 @@ export default function MainTabs() {
   const insets = useSafeAreaInsets();
   const { colors, isDark, hydrateFromServer } = useAppTheme();
   const bottomPad = Math.max(insets.bottom, 10);
-  const unread = useUnreadCount();
+  const unread = useUnreadCounts().total;
   const moreBadge = unread > 0 ? (unread > 99 ? "99+" : String(unread)) : undefined;
 
   useEffect(() => {

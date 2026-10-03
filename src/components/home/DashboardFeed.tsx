@@ -17,6 +17,7 @@ import type { IconName } from "../../config/features";
 
 export type HomeNavigation = {
   openNotifications: () => void;
+  openErrors: () => void;
   openDocuments: () => void;
   openReports: (reportId?: "profit-and-loss" | "balance-sheet") => void;
   openQueue: () => void;
@@ -32,6 +33,7 @@ type Props = {
   periodLabel: string;
   loading: boolean;
   unread: number;
+  unreadErrors: number;
   navigation: HomeNavigation;
 };
 
@@ -148,6 +150,7 @@ export default function DashboardFeed({
   periodLabel,
   loading,
   unread,
+  unreadErrors,
   navigation,
 }: Props) {
   const { colors } = useAppTheme();
@@ -172,33 +175,60 @@ export default function DashboardFeed({
     switch (sectionId) {
       case "notifications": {
         const items = secondary.notifications.data;
+        const errors = secondary.errorNotifications.data;
         return (
-          <WidgetCard
-            title={unread > 0 ? `Notifications (${unread} unread)` : "Notifications"}
-            icon="notifications-outline"
-            onPress={navigation.openNotifications}
-          >
-            {items.length === 0 ? (
-              <WidgetEmpty
-                text={
-                  unread > 0
-                    ? "Open to read your unread notifications."
-                    : "No recent notifications."
-                }
-              />
-            ) : (
-              items.map((item) => (
-                <View key={item.id} style={styles.listRow}>
-                  <View style={styles.listCopy}>
-                    <Text style={styles.listTitle} numberOfLines={1}>
-                      {item.title || item.message || "Notification"}
-                    </Text>
-                    <Text style={styles.listMeta}>{formatDateTime(item.timestamp)}</Text>
+          <View style={styles.panelPair}>
+            <WidgetCard
+              title={unread > 0 ? `Notifications (${unread} unread)` : "Notifications"}
+              icon="notifications-outline"
+              onPress={navigation.openNotifications}
+            >
+              {items.length === 0 ? (
+                <WidgetEmpty
+                  text={
+                    unread > 0
+                      ? "Open to read your unread notifications."
+                      : "No recent notifications."
+                  }
+                />
+              ) : (
+                items.map((item) => (
+                  <View key={item.id} style={styles.listRow}>
+                    <View style={styles.listCopy}>
+                      <Text style={styles.listTitle} numberOfLines={1}>
+                        {item.title || item.message || "Notification"}
+                      </Text>
+                      <Text style={styles.listMeta}>{formatDateTime(item.timestamp)}</Text>
+                    </View>
                   </View>
-                </View>
-              ))
-            )}
-          </WidgetCard>
+                ))
+              )}
+            </WidgetCard>
+            <WidgetCard
+              title={unreadErrors > 0 ? `Errors (${unreadErrors} unread)` : "Errors"}
+              icon="alert-circle-outline"
+              iconColor={colors.danger}
+              iconBackground={colors.dangerSoft}
+              onPress={navigation.openErrors}
+            >
+              {errors.length === 0 ? (
+                <WidgetEmpty
+                  text={unreadErrors > 0 ? "Open to review unread errors." : "No recent errors."}
+                />
+              ) : (
+                errors.map((item) => (
+                  <View key={item.id} style={styles.listRow}>
+                    <View style={styles.listCopy}>
+                      <Text style={styles.listTitle} numberOfLines={1}>
+                        {item.title || item.message || "Error"}
+                      </Text>
+                      <Text style={styles.listMeta}>{formatDateTime(item.timestamp)}</Text>
+                    </View>
+                  </View>
+                ))
+              )}
+            </WidgetCard>
+          </View>
         );
       }
       case "actionInbox": {
@@ -822,6 +852,9 @@ export default function DashboardFeed({
 function createStyles({ colors, type }: ThemeTokens) {
   return {
     stack: {
+      gap: space.md,
+    },
+    panelPair: {
       gap: space.md,
     },
     hero: {
