@@ -176,12 +176,17 @@ pnpm build:staging -- --no-wait
 
 ## Quality checks
 
+`pnpm install` installs a Git commit hook. Every commit runs ESLint and the unit tests. The same checks run on pull requests and on pushes to `dev`.
+
 ```bash
-pnpm lint
+pnpm lint:check          # ESLint, no autofix
 pnpm lint:fix
+pnpm test                # Jest unit tests + version-tools tests
+pnpm test:watch
 pnpm format
 pnpm format:check
-pnpm test:version-tools
+pnpm precommit           # lint:check + test (also runs from the commit hook)
+pnpm pre-pr              # lint:check + format:check + test
 ```
 
 ---

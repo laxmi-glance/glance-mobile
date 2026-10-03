@@ -8,10 +8,7 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import {
-  UploadSourceContext,
-  useUploadSourceMenu,
-} from "../hooks/useUploadSourceMenu";
+import { UploadSourceContext, useUploadSourceMenu } from "../hooks/useUploadSourceMenu";
 import { makeShadow, radius, useAppTheme, useThemedStyles, type ThemeTokens } from "../theme";
 import type { IconName } from "../config/features";
 
