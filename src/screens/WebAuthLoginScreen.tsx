@@ -11,6 +11,7 @@ import Button from "../components/Button";
 import { useThemedStyles, type ThemeTokens } from "../theme";
 
 const AUTH_TIMEOUT_MS = 10 * 60 * 1000;
+const CODE_PREVIEW_MS = 3000;
 const POLL_MS = 1500;
 
 type StartResponse = {
@@ -160,6 +161,15 @@ export default function WebAuthLoginScreen({ navigation }: WebAuthLoginScreenPro
         started = data;
         sessionRef.current = data;
         setUserCode(typeof data.user_code === "string" ? data.user_code : "");
+        // Keep the code on screen before the browser takes over so it can be read.
+        await new Promise((resolve) => setTimeout(resolve, CODE_PREVIEW_MS));
+        if (cancelled || generation !== startGeneration) {
+          if (sessionRef.current === data) {
+            sessionRef.current = null;
+          }
+          await cancelSession(data);
+          return;
+        }
         await openBrowser(data.login_path);
         if (cancelled || generation !== startGeneration) {
           if (sessionRef.current === data) {
