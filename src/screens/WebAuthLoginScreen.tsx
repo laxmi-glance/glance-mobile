@@ -161,7 +161,7 @@ export default function WebAuthLoginScreen({ navigation }: WebAuthLoginScreenPro
         started = data;
         sessionRef.current = data;
         setUserCode(typeof data.user_code === "string" ? data.user_code : "");
-        // Keep the code on screen before the browser takes over so it can be read.
+        // Keep the number on screen before the browser takes over so it can be read.
         await new Promise((resolve) => setTimeout(resolve, CODE_PREVIEW_MS));
         if (cancelled || generation !== startGeneration) {
           if (sessionRef.current === data) {
@@ -178,7 +178,7 @@ export default function WebAuthLoginScreen({ navigation }: WebAuthLoginScreenPro
           await cancelSession(data);
           return;
         }
-        setStatusText("Finish sign in in your browser. This app continues automatically.");
+        setStatusText("Pick the same number in your browser. This app continues automatically.");
         setLoginPath(data.login_path);
       } catch (error) {
         if (started && sessionRef.current === started) {
@@ -257,7 +257,9 @@ export default function WebAuthLoginScreen({ navigation }: WebAuthLoginScreenPro
             <Text style={styles.code} selectable>
               {userCode}
             </Text>
-            <Text style={styles.codeHint}>Not there? Close the browser and try again.</Text>
+            <Text style={styles.codeHint}>
+              Cancel and start again if the browser does not offer this number.
+            </Text>
           </View>
         ) : null}
         {loginPath ? (
