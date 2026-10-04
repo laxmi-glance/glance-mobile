@@ -253,11 +253,11 @@ export default function WebAuthLoginScreen({ navigation }: WebAuthLoginScreenPro
         <Text style={styles.lead}>{statusText}</Text>
         {userCode ? (
           <View style={styles.codeBox}>
-            <Text style={styles.codeLabel}>Enter this code in the browser</Text>
+            <Text style={styles.codeLabel}>Pick this number in the browser</Text>
             <Text style={styles.code} selectable>
               {userCode}
             </Text>
-            <Text style={styles.codeHint}>Only enter it if you started this sign-in.</Text>
+            <Text style={styles.codeHint}>Not there? Close the browser and try again.</Text>
           </View>
         ) : null}
         {loginPath ? (
