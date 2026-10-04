@@ -13,6 +13,7 @@ import type { IconName } from "../config/features";
 import { UploadSourceProvider } from "../components/UploadSourceMenu";
 import { useUploadSource } from "../hooks/useUploadSourceMenu";
 import { useUnreadCounts } from "../hooks/useUnreadCount";
+import { useRbac } from "../hooks/useRbac";
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const UPLOAD_GOLD = "#D4AF37";
@@ -98,6 +99,11 @@ function MainTabNavigator({
   moreBadge: string | undefined;
 }) {
   const { hide } = useUploadSource();
+  const { canViewAp, canUpload, allows, loading: rbacLoading } = useRbac();
+  const canViewReports = allows("reports", "view");
+  const hideAp = !rbacLoading && !canViewAp;
+  const hideUpload = !rbacLoading && !canUpload;
+  const hideReports = !rbacLoading && !canViewReports;
 
   return (
     <Tab.Navigator
@@ -141,6 +147,8 @@ function MainTabNavigator({
         component={ApListScreen}
         options={{
           title: "Documents",
+          tabBarItemStyle: hideAp ? styles.hiddenTab : { overflow: "visible" },
+          tabBarButton: hideAp ? () => null : undefined,
           tabBarIcon: ({ color, focused }) => (
             <TabBarIcon
               color={color}
@@ -157,7 +165,8 @@ function MainTabNavigator({
         options={{
           title: "Upload",
           tabBarLabel: () => null,
-          tabBarButton: () => <UploadTabButton />,
+          tabBarItemStyle: hideUpload ? styles.hiddenTab : { overflow: "visible" },
+          tabBarButton: hideUpload ? () => null : () => <UploadTabButton />,
         }}
         listeners={{
           tabPress: (event) => {
@@ -170,6 +179,8 @@ function MainTabNavigator({
         component={ReportsListScreen}
         options={{
           title: "Reports",
+          tabBarItemStyle: hideReports ? styles.hiddenTab : { overflow: "visible" },
+          tabBarButton: hideReports ? () => null : undefined,
           tabBarIcon: ({ color, focused }) => (
             <TabBarIcon
               color={color}
@@ -199,6 +210,12 @@ function MainTabNavigator({
 }
 
 const styles = StyleSheet.create({
+  hiddenTab: {
+    display: "none",
+    width: 0,
+    height: 0,
+    overflow: "hidden",
+  },
   tabBar: {
     borderTopWidth: 0,
     borderTopLeftRadius: 20,

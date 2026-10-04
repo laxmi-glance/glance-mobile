@@ -1,16 +1,6 @@
 import type { DashboardLayoutKey, DashboardPeriod, DashboardSectionId } from "../types/dashboard";
 import type { IconName } from "./features";
 
-export const DOC_PROCESSING_ROLES = [
-  "owner",
-  "admin",
-  "accountant",
-  "standard_user",
-  "auditor",
-  "sales_manager",
-  "mis_reporter",
-];
-
 export const DASHBOARD_PERIODS: { value: DashboardPeriod; label: string }[] = [
   { value: "fy", label: "FY to date" },
   { value: "mtd", label: "Month to date" },

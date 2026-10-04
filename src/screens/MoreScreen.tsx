@@ -41,6 +41,7 @@ import {
 import { useUnreadCounts } from "../hooks/useUnreadCount";
 import { notificationHeaderShortcuts } from "../components/notificationHeaderShortcuts";
 import ThemePicker from "../components/ThemePicker";
+import { useRbac } from "../hooks/useRbac";
 
 const PROFILE_WEB_URL = `${FRONTEND_URL.replace(/\/+$/, "")}/user/user-profile`;
 const PANEL_BG = "#1C1C1E";
@@ -63,6 +64,8 @@ export default function MoreScreen({ navigation }: MoreScreenProps) {
     navigation.navigate("Notifications", { panel });
   };
   const { colors, setTheme, hydrateFromServer } = useAppTheme();
+  const { allows, loading: rbacLoading } = useRbac();
+  const canOpenAccounting = allows("ledger", "view") || allows("gl", "view");
   const styles = useThemedStyles(createStyles);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [tenant, setTenant] = useState<Tenant | null>(null);
@@ -255,13 +258,17 @@ export default function MoreScreen({ navigation }: MoreScreenProps) {
           onPress={handleSwitchWorkspace}
         />
 
-        <Text style={styles.section}>Accounting</Text>
-        <ListRow
-          icon="book-outline"
-          label="Accounting"
-          subtitle="Chart of accounts and general ledger"
-          onPress={() => navigation.navigate("Accounting")}
-        />
+        {!rbacLoading && canOpenAccounting ? (
+          <>
+            <Text style={styles.section}>Accounting</Text>
+            <ListRow
+              icon="book-outline"
+              label="Accounting"
+              subtitle="Chart of accounts and general ledger"
+              onPress={() => navigation.navigate("Accounting")}
+            />
+          </>
+        ) : null}
 
         <Text style={styles.section}>Appearance</Text>
         <ThemePicker />

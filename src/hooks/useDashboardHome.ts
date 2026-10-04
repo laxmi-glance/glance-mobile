@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 import {
-  DOC_PROCESSING_ROLES,
   DASHBOARD_PERIODS,
   getLayoutSections,
   getPeriodLabel,
@@ -22,7 +21,13 @@ import {
   parseLayoutConfig,
 } from "../utils/dashboardLayout";
 import { getDisplayFirstName, getGreeting } from "../utils/greeting";
-import { rbacAllows } from "../utils/rbac";
+import {
+  canAccessConsolidatedDashboard,
+  canReadDocumentProcessor,
+  canViewFinancialDocumentsOnSide,
+  dashboardScopeAllows,
+  rbacAllows,
+} from "../utils/rbac";
 import notificationService from "../services/notification.service";
 import { isInErrorsTab, isInGeneralTab } from "../utils/notificationKind";
 import type {
@@ -91,27 +96,43 @@ export function useDashboardHome() {
   const fetchGen = useRef(0);
 
   const perms: DashboardPerms = useMemo(() => {
-    const role = String(rbac.role || "").toLowerCase();
+    const canViewFinancialDashboard = dashboardScopeAllows(rbac.config, rbac.role, [
+      "view_full",
+      "view_financial",
+    ]);
+    const canViewTopParties = dashboardScopeAllows(rbac.config, rbac.role, [
+      "view_full",
+      "view_financial",
+      "view_sales",
+    ]);
+    const canViewApInsights = canViewFinancialDocumentsOnSide(rbac.config, rbac.role, "ap");
+    const canViewAr = canViewFinancialDocumentsOnSide(rbac.config, rbac.role, "ar");
+    const canViewStatutoryReports = rbacAllows(rbac.config, rbac.role, "reports", "view");
     return {
-      role,
-      isOwnerOrAdmin: role === "owner" || role === "admin",
       canApprove: rbac.canApprove,
       canUpload: rbac.canUpload,
-      canViewStatutoryReports: rbacAllows(rbac.config, rbac.role, "reports", "view"),
+      canViewStatutoryReports,
       canViewBanking: rbacAllows(rbac.config, rbac.role, "bank", "view"),
       canViewGlList: rbacAllows(rbac.config, rbac.role, "ledger", "view"),
       canViewGl: rbacAllows(rbac.config, rbac.role, "gl", "view"),
-      canViewApInsights: rbac.canViewAp,
-      canViewArInsights:
-        rbacAllows(rbac.config, rbac.role, "financial_document", "view_team") ||
-        rbacAllows(rbac.config, rbac.role, "financial_document", "view_all"),
-      canAccessDocProcessing: DOC_PROCESSING_ROLES.includes(role),
+      canViewApInsights,
+      canAccessDocProcessing: canReadDocumentProcessor(rbac.config, rbac.role),
       canViewTds: rbacAllows(rbac.config, rbac.role, "tds", "view"),
-      canViewFinancialDashboard:
-        rbacAllows(rbac.config, rbac.role, "dashboard", "view_full") ||
-        rbacAllows(rbac.config, rbac.role, "dashboard", "view_financial"),
+      canViewFinancialDashboard,
+      canViewActionItems: dashboardScopeAllows(rbac.config, rbac.role, [
+        "view_full",
+        "view_purchase",
+        "view_sales",
+      ]),
+      canViewInventorySummary: dashboardScopeAllows(rbac.config, rbac.role, [
+        "view_full",
+        "view_sales",
+      ]),
+      canViewTopVendors: canViewTopParties && canViewApInsights,
+      canViewTopCustomers: canViewTopParties && canViewAr,
+      canAccessConsolidated: canAccessConsolidatedDashboard(rbac.config, rbac.role),
     };
-  }, [rbac.role, rbac.canApprove, rbac.canUpload, rbac.canViewAp, rbac.config]);
+  }, [rbac.role, rbac.canApprove, rbac.canUpload, rbac.config]);
 
   const setPeriod = useCallback((next: DashboardPeriod) => {
     setPeriodState(next);
@@ -147,7 +168,9 @@ export function useDashboardHome() {
         tenantService.getSelectedTenant(),
         companyService.getCurrent(),
         preferencesService.get().catch(() => ({}) as UserPreferences),
-        dashboardService.getComplete().catch(() => null),
+        perms.canAccessConsolidated
+          ? dashboardService.getComplete().catch(() => null)
+          : Promise.resolve(null),
       ]);
       if (gen !== fetchGen.current) {
         return;
@@ -181,7 +204,7 @@ export function useDashboardHome() {
         next[key] = value;
       };
 
-      if (visible.has("actionInbox") || visible.has("myWork")) {
+      if (visible.has("actionInbox") && perms.canViewActionItems) {
         tasks.push(
           dashboardService
             .getActionItems()
@@ -189,7 +212,11 @@ export function useDashboardHome() {
             .catch(() => assign("actionItems", { loading: false, data: [] }))
         );
       }
-      if (visible.has("myWork") && (perms.canApprove || perms.canAccessDocProcessing)) {
+      if (
+        visible.has("myWork") &&
+        perms.canViewActionItems &&
+        (perms.canApprove || perms.canAccessDocProcessing)
+      ) {
         tasks.push(
           dashboardService
             .getMyPendingApprovals()
@@ -232,10 +259,7 @@ export function useDashboardHome() {
             .catch(() => assign("cashFlowTrend", { loading: false, data: null }))
         );
       }
-      if (
-        visible.has("workingCapital") &&
-        (perms.canViewApInsights || perms.canViewArInsights || perms.canViewStatutoryReports)
-      ) {
+      if (visible.has("workingCapital") && perms.canViewFinancialDashboard) {
         tasks.push(
           dashboardService
             .getWorkingCapital()
@@ -259,7 +283,7 @@ export function useDashboardHome() {
             .catch(() => assign("tdsSummary", { loading: false, data: null }))
         );
       }
-      if (visible.has("priorYearBenchmark") && perms.canViewStatutoryReports) {
+      if (visible.has("priorYearBenchmark") && perms.canViewFinancialDashboard) {
         tasks.push(
           dashboardService
             .getPriorYearBenchmark()
@@ -267,7 +291,7 @@ export function useDashboardHome() {
             .catch(() => assign("priorYearBenchmark", { loading: false, data: null }))
         );
       }
-      if (visible.has("inventorySummary")) {
+      if (visible.has("inventorySummary") && perms.canViewInventorySummary) {
         tasks.push(
           dashboardService
             .getInventorySummary()
@@ -283,7 +307,7 @@ export function useDashboardHome() {
             .catch(() => assign("processingStats", { loading: false, data: null }))
         );
       }
-      if (visible.has("topVendors") && perms.canViewApInsights) {
+      if (visible.has("topVendors") && perms.canViewTopVendors) {
         tasks.push(
           dashboardService
             .getTopParties("AP", activePeriod)
@@ -291,7 +315,7 @@ export function useDashboardHome() {
             .catch(() => assign("topVendors", { loading: false, data: [] }))
         );
       }
-      if (visible.has("topCustomers") && perms.canViewArInsights) {
+      if (visible.has("topCustomers") && perms.canViewTopCustomers) {
         tasks.push(
           dashboardService
             .getTopParties("AR", activePeriod)
@@ -307,7 +331,7 @@ export function useDashboardHome() {
             .catch(() => assign("recommendationStats", { loading: false, data: null }))
         );
       }
-      if (visible.has("activityFeed") && (perms.isOwnerOrAdmin || perms.role === "accountant")) {
+      if (visible.has("activityFeed") && perms.canViewStatutoryReports) {
         tasks.push(
           dashboardService
             .getUserActivity()
@@ -323,7 +347,7 @@ export function useDashboardHome() {
             .catch(() => assign("recentJE", { loading: false, data: [] }))
         );
       }
-      if (visible.has("sync") && (perms.isOwnerOrAdmin || perms.role === "accountant")) {
+      if (visible.has("sync") && perms.canViewStatutoryReports) {
         tasks.push(
           dashboardService
             .getErpSyncStatus()

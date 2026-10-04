@@ -21,10 +21,12 @@ import PageHeader from "../components/PageHeader";
 import { apiErrorMessage } from "../utils/errors";
 import { mergeUniqueById } from "../utils/lists";
 import { radius, space, useAppTheme, useThemedStyles, type ThemeTokens } from "../theme";
+import { useRbac } from "../hooks/useRbac";
 
 export default function ProcessingQueueScreen({ navigation }: QueueScreenProps) {
   const { colors } = useAppTheme();
   const styles = useThemedStyles(createStyles);
+  const { canReadDocumentProcessor, loading: rbacLoading } = useRbac();
   const [documents, setDocuments] = useState<PreprocessingDocument[]>([]);
   const [stats, setStats] = useState<QueueStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -44,6 +46,9 @@ export default function ProcessingQueueScreen({ navigation }: QueueScreenProps) 
 
   const loadDocuments = useCallback(
     async (pageNum = 1, replace = false, query = searchRef.current) => {
+      if (rbacLoading || !canReadDocumentProcessor) {
+        return;
+      }
       const isReplace = replace || pageNum === 1;
       if (isReplace) {
         fetchGen.current += 1;
@@ -83,12 +88,15 @@ export default function ProcessingQueueScreen({ navigation }: QueueScreenProps) 
         setLoadingMore(false);
       }
     },
-    [summaryStatus]
+    [canReadDocumentProcessor, rbacLoading, summaryStatus]
   );
 
   useEffect(() => {
+    if (rbacLoading || !canReadDocumentProcessor) {
+      return;
+    }
     void loadDocuments(1, true);
-  }, [loadDocuments]);
+  }, [canReadDocumentProcessor, loadDocuments, rbacLoading]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -119,6 +127,42 @@ export default function ProcessingQueueScreen({ navigation }: QueueScreenProps) 
     setLoading(true);
     setSummaryStatus(next);
   };
+
+  if (rbacLoading) {
+    return (
+      <Screen edges={["bottom"]}>
+        <PageHeader
+          title="Queue"
+          subtitle="Documents in processing"
+          icon="file-tray-full-outline"
+          showBack={navigation.canGoBack()}
+          onBack={() => navigation.goBack()}
+        />
+        <View style={styles.overlay}>
+          <ActivityIndicator size="large" color={colors.brand} />
+        </View>
+      </Screen>
+    );
+  }
+
+  if (!canReadDocumentProcessor) {
+    return (
+      <Screen edges={["bottom"]}>
+        <PageHeader
+          title="Queue"
+          subtitle="Documents in processing"
+          icon="file-tray-full-outline"
+          showBack={navigation.canGoBack()}
+          onBack={() => navigation.goBack()}
+        />
+        <EmptyState
+          icon="lock-closed-outline"
+          title="Processing queue is not available"
+          hint="Your role cannot view document processing in this workspace."
+        />
+      </Screen>
+    );
+  }
 
   return (
     <Screen edges={["bottom"]}>

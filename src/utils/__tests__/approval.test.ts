@@ -22,6 +22,9 @@ const config: RbacConfig = {
     standard_user: {
       financial_document: ["self_approve", "view_own"],
     },
+    sales_manager: {
+      financial_document: ["approve", "view_ap", "view_ar", "view_own"],
+    },
   },
 };
 
@@ -81,12 +84,7 @@ describe("display helpers", () => {
 });
 
 describe("canActOnApproval", () => {
-  test("blocks sales managers, viewers, posted docs, and unfinished processing", () => {
-    expect(canActOnApproval(detail(), config, "sales_manager")).toEqual({
-      canApprove: false,
-      canReject: false,
-      reason: "Forwarding for approval is available on the web app.",
-    });
+  test("blocks viewers, posted docs, and unfinished processing", () => {
     expect(canActOnApproval(detail(), config, "auditor")).toEqual({
       canApprove: false,
       canReject: false,
@@ -101,6 +99,37 @@ describe("canActOnApproval", () => {
         "accountant"
       ).reason
     ).toBe("Wait until processing finishes.");
+  });
+
+  test("lets a sales manager approve someone else's document", () => {
+    expect(
+      canActOnApproval(detail({ approval_status: "pending", total: "10" }), config, "sales_manager")
+    ).toEqual({
+      canApprove: true,
+      canReject: true,
+    });
+    expect(
+      canActOnApproval(
+        detail({ created_by: "ada", approval_status: "pending", total: "10" }),
+        config,
+        "sales_manager",
+        "ada"
+      ).reason
+    ).toBe("You cannot approve a document you uploaded.");
+  });
+
+  test("self-approve alone does not approve someone else's document", () => {
+    expect(
+      canActOnApproval(
+        detail({ created_by: "other", approval_status: "pending", total: "10" }),
+        config,
+        "standard_user",
+        "ada"
+      )
+    ).toEqual({
+      canApprove: false,
+      canReject: false,
+    });
   });
 
   test("blocks approving your own upload unless self-approve is allowed", () => {
