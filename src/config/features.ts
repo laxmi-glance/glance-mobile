@@ -10,7 +10,7 @@ export type AppFeature = {
   subtitle: string;
   icon: IconName;
   available: boolean;
-  tab?: Exclude<keyof MainTabParamList, "Scan">;
+  tab?: Exclude<keyof MainTabParamList, "Upload">;
   stack?: keyof RootStackParamList;
 };
 
@@ -59,11 +59,12 @@ export const APP_FEATURES: AppFeature[] = [
     tab: "Reports",
   },
   {
-    id: "ledger",
-    title: "General ledger",
-    subtitle: "Accounts and journal entries",
+    id: "accounting",
+    title: "Accounting",
+    subtitle: "Chart of accounts and general ledger",
     icon: "book-outline",
-    available: false,
+    available: true,
+    stack: "Accounting",
   },
 ];
 

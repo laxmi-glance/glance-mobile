@@ -15,7 +15,7 @@ import preferencesService from "../services/preferences.service";
 import tenantService from "../services/tenant.service";
 import { useAppTheme } from "../theme";
 import { useRbac } from "./useRbac";
-import { useUnreadCount } from "./useUnreadCount";
+import { useUnreadCounts } from "./useUnreadCount";
 import {
   getVisibleSections,
   isDefaultLayoutConfig,
@@ -24,6 +24,7 @@ import {
 import { getDisplayFirstName, getGreeting } from "../utils/greeting";
 import { rbacAllows } from "../utils/rbac";
 import notificationService from "../services/notification.service";
+import { isInErrorsTab, isInGeneralTab } from "../utils/notificationKind";
 import type {
   CompleteDashboard,
   DashboardPeriod,
@@ -58,6 +59,7 @@ const emptySecondary = (): DashboardSecondary => ({
   recentJE: { ...idleList },
   erpSync: { ...idleValue },
   notifications: { ...idleList },
+  errorNotifications: { ...idleList },
 });
 
 function isPeriod(value: string | null): value is DashboardPeriod {
@@ -66,7 +68,7 @@ function isPeriod(value: string | null): value is DashboardPeriod {
 
 export function useDashboardHome() {
   const rbac = useRbac();
-  const unread = useUnreadCount();
+  const unreadCounts = useUnreadCounts();
   const { applyFromPreferences, getThemeWriteEpoch } = useAppTheme();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [companyName, setCompanyName] = useState("Workspace");
@@ -98,12 +100,16 @@ export function useDashboardHome() {
       canViewStatutoryReports: rbacAllows(rbac.config, rbac.role, "reports", "view"),
       canViewBanking: rbacAllows(rbac.config, rbac.role, "bank", "view"),
       canViewGlList: rbacAllows(rbac.config, rbac.role, "ledger", "view"),
+      canViewGl: rbacAllows(rbac.config, rbac.role, "gl", "view"),
       canViewApInsights: rbac.canViewAp,
       canViewArInsights:
         rbacAllows(rbac.config, rbac.role, "financial_document", "view_team") ||
         rbacAllows(rbac.config, rbac.role, "financial_document", "view_all"),
       canAccessDocProcessing: DOC_PROCESSING_ROLES.includes(role),
       canViewTds: rbacAllows(rbac.config, rbac.role, "tds", "view"),
+      canViewFinancialDashboard:
+        rbacAllows(rbac.config, rbac.role, "dashboard", "view_full") ||
+        rbacAllows(rbac.config, rbac.role, "dashboard", "view_financial"),
     };
   }, [rbac.role, rbac.canApprove, rbac.canUpload, rbac.canViewAp, rbac.config]);
 
@@ -215,7 +221,10 @@ export function useDashboardHome() {
             .catch(() => assign("balanceSheet", { loading: false, data: null }))
         );
       }
-      if (visible.has("cashFlowTrend") && perms.canViewBanking) {
+      if (
+        visible.has("cashFlowTrend") &&
+        (perms.canViewBanking || perms.canViewFinancialDashboard)
+      ) {
         tasks.push(
           dashboardService
             .getCashFlowTrend()
@@ -234,7 +243,7 @@ export function useDashboardHome() {
             .catch(() => assign("workingCapital", { loading: false, data: null }))
         );
       }
-      if (visible.has("compliance") && ["owner", "admin", "accountant"].includes(perms.role)) {
+      if (visible.has("compliance") && perms.canViewFinancialDashboard) {
         tasks.push(
           dashboardService
             .getComplianceEvents()
@@ -242,7 +251,7 @@ export function useDashboardHome() {
             .catch(() => assign("complianceEvents", { loading: false, data: [] }))
         );
       }
-      if (visible.has("tdsSummary") && perms.canViewTds) {
+      if (visible.has("tdsSummary") && (perms.canViewTds || perms.canViewFinancialDashboard)) {
         tasks.push(
           dashboardService
             .getTdsSummary(activePeriod)
@@ -325,11 +334,25 @@ export function useDashboardHome() {
       if (visible.has("notifications")) {
         tasks.push(
           notificationService
-            .list(1)
+            .list(1, "notifications")
             .then((data) =>
-              assign("notifications", { loading: false, data: (data.results || []).slice(0, 5) })
+              assign("notifications", {
+                loading: false,
+                data: (data.results || []).filter(isInGeneralTab).slice(0, 5),
+              })
             )
             .catch(() => assign("notifications", { loading: false, data: [] }))
+        );
+        tasks.push(
+          notificationService
+            .list(1, "errors")
+            .then((data) =>
+              assign("errorNotifications", {
+                loading: false,
+                data: (data.results || []).filter(isInErrorsTab).slice(0, 5),
+              })
+            )
+            .catch(() => assign("errorNotifications", { loading: false, data: [] }))
         );
       }
 
@@ -425,7 +448,8 @@ export function useDashboardHome() {
     companyName,
     logoUri,
     greeting,
-    unread,
+    unread: unreadCounts.general,
+    unreadErrors: unreadCounts.errors,
     period,
     periodLabel: getPeriodLabel(period),
     cyclePeriod,

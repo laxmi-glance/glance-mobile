@@ -33,6 +33,11 @@ import ApDocumentScreen from "./src/screens/ApDocumentScreen";
 import NotificationsScreen from "./src/screens/NotificationsScreen";
 import ProcessingQueueScreen from "./src/screens/ProcessingQueueScreen";
 import ReportScreen from "./src/screens/ReportScreen";
+import AccountingScreen from "./src/screens/AccountingScreen";
+import ChartOfAccountsScreen from "./src/screens/ChartOfAccountsScreen";
+import LedgerAccountScreen from "./src/screens/LedgerAccountScreen";
+import GeneralLedgerScreen from "./src/screens/GeneralLedgerScreen";
+import JournalEntryScreen from "./src/screens/JournalEntryScreen";
 import ScannerScreen from "./src/screens/ScannerScreen";
 import MainTabs from "./src/navigation/MainTabs";
 import rbacService from "./src/services/rbac.service";
@@ -240,6 +245,31 @@ function ThemedNavigation({
             }}
           />
           <Stack.Screen name="Report" component={ReportScreen} options={{ headerShown: false }} />
+          <Stack.Screen
+            name="Accounting"
+            component={AccountingScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="ChartOfAccounts"
+            component={ChartOfAccountsScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="LedgerAccount"
+            component={LedgerAccountScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="GeneralLedger"
+            component={GeneralLedgerScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="JournalEntry"
+            component={JournalEntryScreen}
+            options={{ headerShown: false }}
+          />
         </Stack.Navigator>
       </NavigationContainer>
     </>

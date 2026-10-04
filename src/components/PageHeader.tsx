@@ -23,10 +23,20 @@ export type PageHeaderMenuAction = {
   destructive?: boolean;
 };
 
+export type PageHeaderShortcut = {
+  icon: IconName;
+  accessibilityLabel: string;
+  badge?: number;
+  badgeTone?: "brand" | "danger";
+  onPress: () => void;
+  active?: boolean;
+};
+
 type Props = {
   title: string;
   subtitle?: string;
   icon?: IconName;
+  iconColor?: string;
   iconUri?: string | null;
   showBack?: boolean;
   onBack?: () => void;
@@ -34,16 +44,52 @@ type Props = {
   supportingAccessibilityLabel?: string;
   supportingBadge?: number;
   onSupportingPress?: () => void;
+  shortcuts?: PageHeaderShortcut[];
   menuActions?: PageHeaderMenuAction[];
 };
 
 const ICON_BG = "#FFFFFF";
 const ICON_SIZE = 40;
 
+function HeaderShortcutButton({ shortcut }: { shortcut: PageHeaderShortcut }) {
+  const { colors } = useAppTheme();
+  const styles = useThemedStyles(createStyles);
+  const badgeLabel =
+    shortcut.badge && shortcut.badge > 0
+      ? shortcut.badge > 99
+        ? "99+"
+        : String(shortcut.badge)
+      : null;
+  const iconColor = shortcut.active
+    ? shortcut.badgeTone === "danger"
+      ? colors.danger
+      : colors.brand
+    : colors.white;
+
+  return (
+    <TouchableOpacity
+      onPress={shortcut.onPress}
+      hitSlop={8}
+      style={[styles.sideBtn, shortcut.active && styles.sideBtnActive]}
+      accessibilityRole="button"
+      accessibilityLabel={shortcut.accessibilityLabel}
+      accessibilityState={{ selected: Boolean(shortcut.active) }}
+    >
+      <Ionicons name={shortcut.icon} size={22} color={iconColor} />
+      {badgeLabel ? (
+        <View style={[styles.badge, shortcut.badgeTone === "brand" && styles.badgeBrand]}>
+          <Text style={styles.badgeText}>{badgeLabel}</Text>
+        </View>
+      ) : null}
+    </TouchableOpacity>
+  );
+}
+
 export default function PageHeader({
   title,
   subtitle,
   icon,
+  iconColor,
   iconUri,
   showBack = false,
   onBack,
@@ -51,6 +97,7 @@ export default function PageHeader({
   supportingAccessibilityLabel,
   supportingBadge,
   onSupportingPress,
+  shortcuts,
   menuActions = [],
 }: Props) {
   const { colors } = useAppTheme();
@@ -62,12 +109,19 @@ export default function PageHeader({
   const [menuTop, setMenuTop] = useState(0);
 
   const showLogo = Boolean(iconUri) && failedLogoUri !== iconUri;
-  const badgeLabel =
-    supportingBadge && supportingBadge > 0
-      ? supportingBadge > 99
-        ? "99+"
-        : String(supportingBadge)
-      : null;
+  const shortcutItems: PageHeaderShortcut[] =
+    shortcuts ??
+    (supportingIcon && onSupportingPress
+      ? [
+          {
+            icon: supportingIcon,
+            accessibilityLabel: supportingAccessibilityLabel || "Shortcut",
+            badge: supportingBadge,
+            badgeTone: "danger",
+            onPress: onSupportingPress,
+          },
+        ]
+      : []);
 
   const openMenu = () => {
     if (!menuActions.length) {
@@ -107,7 +161,7 @@ export default function PageHeader({
             onError={() => setFailedLogoUri(iconUri ?? null)}
           />
         ) : icon ? (
-          <Ionicons name={icon} size={22} color={colors.brand} />
+          <Ionicons name={icon} size={22} color={iconColor || colors.brand} />
         ) : (
           <BrandMark size={22} />
         )}
@@ -124,22 +178,9 @@ export default function PageHeader({
         ) : null}
       </View>
 
-      {supportingIcon && onSupportingPress ? (
-        <TouchableOpacity
-          onPress={onSupportingPress}
-          hitSlop={8}
-          style={styles.sideBtn}
-          accessibilityRole="button"
-          accessibilityLabel={supportingAccessibilityLabel || "Shortcut"}
-        >
-          <Ionicons name={supportingIcon} size={22} color={colors.white} />
-          {badgeLabel ? (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{badgeLabel}</Text>
-            </View>
-          ) : null}
-        </TouchableOpacity>
-      ) : null}
+      {shortcutItems.map((shortcut) => (
+        <HeaderShortcutButton key={shortcut.accessibilityLabel} shortcut={shortcut} />
+      ))}
 
       {menuActions.length > 0 ? (
         <View ref={menuBtnRef} collapsable={false}>
@@ -196,6 +237,10 @@ function createStyles({ colors, type }: ThemeTokens) {
       height: 36,
       alignItems: "center",
       justifyContent: "center",
+      borderRadius: 18,
+    },
+    sideBtnActive: {
+      backgroundColor: colors.white,
     },
     pageIcon: {
       width: ICON_SIZE,
@@ -235,6 +280,9 @@ function createStyles({ colors, type }: ThemeTokens) {
       backgroundColor: colors.danger,
       alignItems: "center",
       justifyContent: "center",
+    },
+    badgeBrand: {
+      backgroundColor: colors.brand,
     },
     badgeText: {
       ...type.overline,

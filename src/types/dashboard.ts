@@ -51,10 +51,12 @@ export type DashboardPerms = {
   canViewStatutoryReports: boolean;
   canViewBanking: boolean;
   canViewGlList: boolean;
+  canViewGl: boolean;
   canViewApInsights: boolean;
   canViewArInsights: boolean;
   canAccessDocProcessing: boolean;
   canViewTds: boolean;
+  canViewFinancialDashboard: boolean;
 };
 
 export type ActionItem = {
@@ -192,6 +194,13 @@ export type DashboardSecondary = {
   recentJE: AsyncList<JournalEntryBrief>;
   erpSync: AsyncValue<Record<string, unknown>>;
   notifications: AsyncList<{
+    id: string;
+    title?: string;
+    message?: string;
+    timestamp?: string;
+    read?: boolean;
+  }>;
+  errorNotifications: AsyncList<{
     id: string;
     title?: string;
     message?: string;

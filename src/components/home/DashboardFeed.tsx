@@ -1,6 +1,6 @@
 import React from "react";
 import { Linking, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Feather, Ionicons } from "@expo/vector-icons";
 import { FRONTEND_URL } from "../../config/env";
 import {
   SECTION_ICONS,
@@ -10,6 +10,7 @@ import {
 } from "../../config/dashboard";
 import { formatDate, formatDateTime } from "../../utils/dates";
 import { formatInr } from "../../utils/money";
+import { postingStatusLabel } from "../../utils/accounting";
 import { radius, space, useAppTheme, useThemedStyles, type ThemeTokens } from "../../theme";
 import type { CompleteDashboard, DashboardPerms, DashboardSecondary } from "../../types/dashboard";
 import WidgetCard, { WidgetEmpty, WidgetSkeleton } from "./WidgetCard";
@@ -17,11 +18,15 @@ import type { IconName } from "../../config/features";
 
 export type HomeNavigation = {
   openNotifications: () => void;
+  openErrors: () => void;
   openDocuments: () => void;
   openReports: (reportId?: "profit-and-loss" | "balance-sheet") => void;
   openQueue: () => void;
-  openScanner: () => void;
+  openUpload: () => void;
   openApDocument: (id: string) => void;
+  openAccounting: () => void;
+  openGeneralLedger: () => void;
+  openJournalEntry: (entryId: string) => void;
 };
 
 type Props = {
@@ -32,6 +37,7 @@ type Props = {
   periodLabel: string;
   loading: boolean;
   unread: number;
+  unreadErrors: number;
   navigation: HomeNavigation;
 };
 
@@ -148,6 +154,7 @@ export default function DashboardFeed({
   periodLabel,
   loading,
   unread,
+  unreadErrors,
   navigation,
 }: Props) {
   const { colors } = useAppTheme();
@@ -172,33 +179,60 @@ export default function DashboardFeed({
     switch (sectionId) {
       case "notifications": {
         const items = secondary.notifications.data;
+        const errors = secondary.errorNotifications.data;
         return (
-          <WidgetCard
-            title={unread > 0 ? `Notifications (${unread} unread)` : "Notifications"}
-            icon="notifications-outline"
-            onPress={navigation.openNotifications}
-          >
-            {items.length === 0 ? (
-              <WidgetEmpty
-                text={
-                  unread > 0
-                    ? "Open to read your unread notifications."
-                    : "No recent notifications."
-                }
-              />
-            ) : (
-              items.map((item) => (
-                <View key={item.id} style={styles.listRow}>
-                  <View style={styles.listCopy}>
-                    <Text style={styles.listTitle} numberOfLines={1}>
-                      {item.title || item.message || "Notification"}
-                    </Text>
-                    <Text style={styles.listMeta}>{formatDateTime(item.timestamp)}</Text>
+          <View style={styles.panelPair}>
+            <WidgetCard
+              title={unread > 0 ? `Notifications (${unread} unread)` : "Notifications"}
+              icon="notifications-outline"
+              onPress={navigation.openNotifications}
+            >
+              {items.length === 0 ? (
+                <WidgetEmpty
+                  text={
+                    unread > 0
+                      ? "Open to read your unread notifications."
+                      : "No recent notifications."
+                  }
+                />
+              ) : (
+                items.map((item) => (
+                  <View key={item.id} style={styles.listRow}>
+                    <View style={styles.listCopy}>
+                      <Text style={styles.listTitle} numberOfLines={1}>
+                        {item.title || item.message || "Notification"}
+                      </Text>
+                      <Text style={styles.listMeta}>{formatDateTime(item.timestamp)}</Text>
+                    </View>
                   </View>
-                </View>
-              ))
-            )}
-          </WidgetCard>
+                ))
+              )}
+            </WidgetCard>
+            <WidgetCard
+              title={unreadErrors > 0 ? `Errors (${unreadErrors} unread)` : "Errors"}
+              icon="alert-circle-outline"
+              iconColor={colors.danger}
+              iconBackground={colors.dangerSoft}
+              onPress={navigation.openErrors}
+            >
+              {errors.length === 0 ? (
+                <WidgetEmpty
+                  text={unreadErrors > 0 ? "Open to review unread errors." : "No recent errors."}
+                />
+              ) : (
+                errors.map((item) => (
+                  <View key={item.id} style={styles.listRow}>
+                    <View style={styles.listCopy}>
+                      <Text style={styles.listTitle} numberOfLines={1}>
+                        {item.title || item.message || "Error"}
+                      </Text>
+                      <Text style={styles.listMeta}>{formatDateTime(item.timestamp)}</Text>
+                    </View>
+                  </View>
+                ))
+              )}
+            </WidgetCard>
+          </View>
         );
       }
       case "actionInbox": {
@@ -225,10 +259,10 @@ export default function DashboardFeed({
         const actions = [
           perms.canUpload
             ? {
-                key: "scan",
-                label: "Scan",
-                icon: "scan-outline" as IconName,
-                onPress: navigation.openScanner,
+                key: "upload",
+                label: "Upload",
+                icon: "cloud-upload-outline" as IconName,
+                onPress: navigation.openUpload,
               }
             : null,
           perms.canViewApInsights
@@ -245,6 +279,14 @@ export default function DashboardFeed({
                 label: "P&L",
                 icon: "bar-chart-outline" as IconName,
                 onPress: () => navigation.openReports("profit-and-loss"),
+              }
+            : null,
+          perms.canViewGlList || perms.canViewGl
+            ? {
+                key: "accounting",
+                label: "Accounting",
+                icon: "book-outline" as IconName,
+                onPress: navigation.openAccounting,
               }
             : null,
           perms.canAccessDocProcessing
@@ -264,7 +306,11 @@ export default function DashboardFeed({
             <View style={styles.chips}>
               {actions.map((action) => (
                 <TouchableOpacity key={action.key} style={styles.chip} onPress={action.onPress}>
-                  <Ionicons name={action.icon} size={16} color={colors.brand} />
+                  {action.key === "upload" ? (
+                    <Feather name="upload" size={16} color={colors.brand} />
+                  ) : (
+                    <Ionicons name={action.icon} size={16} color={colors.brand} />
+                  )}
                   <Text style={styles.chipLabel}>{action.label}</Text>
                 </TouchableOpacity>
               ))}
@@ -770,23 +816,57 @@ export default function DashboardFeed({
         }
         const entries = secondary.recentJE.data;
         return (
-          <WidgetCard title="Recent journal entries" icon="book-outline">
+          <WidgetCard
+            title="Recent journal entries"
+            icon="book-outline"
+            extra={
+              perms.canViewGl ? (
+                <TouchableOpacity
+                  onPress={navigation.openGeneralLedger}
+                  accessibilityRole="button"
+                  accessibilityLabel="Open general ledger"
+                >
+                  <Text style={styles.linkText}>See all</Text>
+                </TouchableOpacity>
+              ) : null
+            }
+          >
             {entries.length === 0 ? (
               <WidgetEmpty text="No recent journal entries." />
             ) : (
-              entries.map((entry) => (
-                <View key={entry.id} style={styles.listRow}>
-                  <View style={styles.listCopy}>
-                    <Text style={styles.listTitle} numberOfLines={1}>
-                      {entry.voucher_number || "Journal"}
-                    </Text>
-                    <Text style={styles.listMeta} numberOfLines={1}>
-                      {formatDate(entry.date)} · {entry.post_status || "draft"}
-                    </Text>
-                  </View>
-                  <Text style={styles.listAmount}>{formatInr(entry.total_debit, true)}</Text>
-                </View>
-              ))
+              entries.map((entry) => {
+                const body = (
+                  <>
+                    <View style={styles.listCopy}>
+                      <Text style={styles.listTitle} numberOfLines={1}>
+                        {entry.voucher_number || "Journal"}
+                      </Text>
+                      <Text style={styles.listMeta} numberOfLines={1}>
+                        {formatDate(entry.date)} · {postingStatusLabel(entry.post_status)}
+                      </Text>
+                    </View>
+                    <Text style={styles.listAmount}>{formatInr(entry.total_debit, true)}</Text>
+                  </>
+                );
+                if (!perms.canViewGl) {
+                  return (
+                    <View key={entry.id} style={styles.listRow}>
+                      {body}
+                    </View>
+                  );
+                }
+                return (
+                  <TouchableOpacity
+                    key={entry.id}
+                    style={styles.listRow}
+                    onPress={() => navigation.openJournalEntry(entry.id)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Open journal ${entry.voucher_number || "entry"}`}
+                  >
+                    {body}
+                  </TouchableOpacity>
+                );
+              })
             )}
           </WidgetCard>
         );
@@ -818,6 +898,9 @@ export default function DashboardFeed({
 function createStyles({ colors, type }: ThemeTokens) {
   return {
     stack: {
+      gap: space.md,
+    },
+    panelPair: {
       gap: space.md,
     },
     hero: {

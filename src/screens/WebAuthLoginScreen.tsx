@@ -11,11 +11,13 @@ import Button from "../components/Button";
 import { useThemedStyles, type ThemeTokens } from "../theme";
 
 const AUTH_TIMEOUT_MS = 10 * 60 * 1000;
+const CODE_PREVIEW_MS = 3000;
 const POLL_MS = 1500;
 
 type StartResponse = {
   session_id: string;
   session_secret: string;
+  user_code: string;
   login_path: string;
 };
 
@@ -46,7 +48,8 @@ export default function WebAuthLoginScreen({ navigation }: WebAuthLoginScreenPro
   const pollInFlight = useRef(false);
   const sessionRef = useRef<StartResponse | null>(null);
   const [statusText, setStatusText] = useState("Opening your browser...");
-  const [canRetry, setCanRetry] = useState(false);
+  const [loginPath, setLoginPath] = useState<string | null>(null);
+  const [userCode, setUserCode] = useState<string>("");
 
   const finishSuccess = useCallback(
     async (data: LoginResponse) => {
@@ -96,7 +99,9 @@ export default function WebAuthLoginScreen({ navigation }: WebAuthLoginScreenPro
     }
     pollInFlight.current = true;
     try {
-      const { data, status } = await apiClient.post<LoginResponse | { status?: string; detail?: string }>(
+      const { data, status } = await apiClient.post<
+        LoginResponse | { status?: string; detail?: string }
+      >(
         "/users/app-login/poll/",
         {
           session_id: session.session_id,
@@ -110,7 +115,11 @@ export default function WebAuthLoginScreen({ navigation }: WebAuthLoginScreenPro
       }
       if (status === 409 && !settled.current) {
         settled.current = true;
-        Alert.alert("Sign in ended", ("detail" in data && data.detail) || "Please try again.");
+        const detail =
+          data && typeof data === "object" && "detail" in data && typeof data.detail === "string"
+            ? data.detail.trim()
+            : "";
+        Alert.alert("Sign in ended", detail || "Please try again.");
         navigation.goBack();
       }
     } finally {
@@ -131,26 +140,57 @@ export default function WebAuthLoginScreen({ navigation }: WebAuthLoginScreenPro
     const generation = ++startGeneration;
     let cancelled = false;
     settled.current = false;
-    setCanRetry(false);
-    setStatusText("Opening your browser...");
 
     (async () => {
+      await Promise.resolve();
+      if (cancelled || generation !== startGeneration) {
+        return;
+      }
+      setLoginPath(null);
+      setUserCode("");
+      setStatusText("Opening your browser...");
+      let started: StartResponse | null = null;
       try {
-        const { data } = await apiClient.post<StartResponse>("/users/app-login/start/", { client: "mobile" });
+        const { data } = await apiClient.post<StartResponse>("/users/app-login/start/", {
+          client: "mobile",
+        });
         if (cancelled || generation !== startGeneration) {
           await cancelSession(data);
           return;
         }
+        started = data;
         sessionRef.current = data;
-        await openBrowser(data.login_path);
+        setUserCode(typeof data.user_code === "string" ? data.user_code : "");
+        // Keep the number on screen before the browser takes over so it can be read.
+        await new Promise((resolve) => setTimeout(resolve, CODE_PREVIEW_MS));
         if (cancelled || generation !== startGeneration) {
+          if (sessionRef.current === data) {
+            sessionRef.current = null;
+          }
+          await cancelSession(data);
           return;
         }
-        setStatusText("Finish sign in in your browser. This app continues automatically.");
-        setCanRetry(true);
+        await openBrowser(data.login_path);
+        if (cancelled || generation !== startGeneration) {
+          if (sessionRef.current === data) {
+            sessionRef.current = null;
+          }
+          await cancelSession(data);
+          return;
+        }
+        setStatusText("Pick the same number in your browser. This app continues automatically.");
+        setLoginPath(data.login_path);
       } catch (error) {
+        if (started && sessionRef.current === started) {
+          sessionRef.current = null;
+        }
+        if (started) {
+          await cancelSession(started);
+        }
         if (!cancelled && generation === startGeneration) {
-          Alert.alert("Could not start sign in", error?.message || "Please try again.");
+          const message =
+            error instanceof Error && error.message ? error.message : "Please try again.";
+          Alert.alert("Could not start sign in", message);
           navigation.goBack();
         }
       }
@@ -211,11 +251,22 @@ export default function WebAuthLoginScreen({ navigation }: WebAuthLoginScreenPro
       <View style={styles.body}>
         <Text style={styles.title}>Waiting for browser sign-in</Text>
         <Text style={styles.lead}>{statusText}</Text>
-        {canRetry && sessionRef.current ? (
+        {userCode ? (
+          <View style={styles.codeBox}>
+            <Text style={styles.codeLabel}>Pick this number in the browser</Text>
+            <Text style={styles.code} selectable>
+              {userCode}
+            </Text>
+            <Text style={styles.codeHint}>
+              Cancel and start again if the browser does not offer this number.
+            </Text>
+          </View>
+        ) : null}
+        {loginPath ? (
           <Button
             label="Open browser again"
             onPress={() => {
-              void openBrowser(sessionRef.current!.login_path).catch(() => undefined);
+              void openBrowser(loginPath).catch(() => undefined);
             }}
             icon="open-outline"
           />
@@ -265,6 +316,28 @@ function createStyles({ colors, type }: ThemeTokens) {
       ...type.callout,
       color: colors.textSecondary,
       marginBottom: 24,
+    },
+    codeBox: {
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 8,
+      padding: 16,
+      marginBottom: 24,
+    },
+    codeLabel: {
+      ...type.callout,
+      color: colors.textSecondary,
+    },
+    code: {
+      ...type.title,
+      color: colors.textHeading,
+      letterSpacing: 4,
+      marginVertical: 8,
+    },
+    codeHint: {
+      ...type.callout,
+      color: colors.textSecondary,
     },
   } as const;
 }
