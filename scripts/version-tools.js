@@ -622,5 +622,7 @@ module.exports = {
   isAffirmativeBumpAnswer,
   formatVersionBumpPrompt,
   isCiEnvironment,
+  openPromptIo,
+  askQuestion,
   main,
 };

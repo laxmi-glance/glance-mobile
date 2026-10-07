@@ -26,7 +26,12 @@ const {
   FORCED_VERSION_ENV,
   main,
 } = require("../scripts/version-tools");
-const { parseArgs, resolveEasProfile } = require("../scripts/build");
+const {
+  parseArgs,
+  parseProductionTargetAnswer,
+  resolveEasProfile,
+  shouldPromptForProductionTarget,
+} = require("../scripts/build");
 
 const packagePath = path.join(__dirname, "..", "package.json");
 const buildEnvPath = path.join(__dirname, "..", "build-env.json");
@@ -435,6 +440,31 @@ function testBuildArgParsing() {
   );
   assertEq(resolveEasProfile("production", false), "production", "production without apk");
   assertEq(resolveEasProfile("local", false), "development", "local → development");
+
+  assertEq(parseProductionTargetAnswer(""), "store", "empty target answer is Play Store");
+  assertEq(parseProductionTargetAnswer(" Store "), "store", "store answer");
+  assertEq(parseProductionTargetAnswer("play store"), "store", "play store answer");
+  assertEq(parseProductionTargetAnswer("aab"), "store", "aab answer");
+  assertEq(parseProductionTargetAnswer("install"), "install", "install answer");
+  assertEq(parseProductionTargetAnswer("APK"), "install", "apk answer");
+  assertEq(parseProductionTargetAnswer("direct install"), "install", "direct install answer");
+  assertEq(parseProductionTargetAnswer("maybe"), null, "unknown target answer");
+  assert(
+    shouldPromptForProductionTarget("production", "android", false),
+    "android production prompts"
+  );
+  assert(
+    !shouldPromptForProductionTarget("production", "android", true),
+    "--apk skips production target prompt"
+  );
+  assert(
+    !shouldPromptForProductionTarget("production", "ios", false),
+    "ios production does not prompt"
+  );
+  assert(
+    !shouldPromptForProductionTarget("staging", "android", false),
+    "staging does not prompt"
+  );
 
   let threw = false;
   try {

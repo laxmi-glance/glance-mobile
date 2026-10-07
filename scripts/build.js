@@ -9,13 +9,17 @@
  *   staging     → EAS profile preview
  *   production  → EAS profile production (or production-apk with --apk)
  *
+ * Interactive Android production builds (no --apk) also ask whether to build a
+ * Play Store AAB or a directly installable APK (same install flow as staging).
+ * Enter / store keeps the Play Store profile. CI skips the prompt and builds the AAB.
+ *
  * Env overrides:
  *   MOBILE_VERSION=1.2.3    Force this env's version in env-versions.json (skips bump prompt)
  *   SKIP_VERSION_BUMP=1     Keep current env-versions.json version (no prompt, no patch bump)
  *
  * Interactive builds ask on stderr: "Current staging version is x.y.z. Do you want to bump it? [y/N]"
  * Answer y/yes to patch-bump that environment only; anything else keeps the current env version.
- * CI (CI/TF_BUILD/GITHUB_ACTIONS/…) skips the prompt and keeps the current env version.
+ * CI (CI/TF_BUILD/GITHUB_ACTIONS/…) skips both prompts and keeps the current env version.
  */
 "use strict";
 
@@ -23,8 +27,10 @@ const path = require("path");
 const { spawnSync } = require("child_process");
 const {
   ENV_NAMES,
+  askQuestion,
   autoBumpForPackagedBuild,
   isCiEnvironment,
+  openPromptIo,
   prepareBuildMetadata,
   resolveAppVersion,
 } = require("./version-tools");
@@ -85,6 +91,69 @@ function parseArgs(argv) {
   return { envName, platform, apk, passthrough };
 }
 
+function formatProductionTargetPrompt() {
+  return "Build for the Android Play Store (AAB) or direct installation like staging (APK)? [Store/install] ";
+}
+
+function parseProductionTargetAnswer(raw) {
+  const answer = String(raw || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+  if (
+    answer === "" ||
+    answer === "store" ||
+    answer === "s" ||
+    answer === "aab" ||
+    answer === "play" ||
+    answer === "play store" ||
+    answer === "1"
+  ) {
+    return "store";
+  }
+  if (
+    answer === "install" ||
+    answer === "i" ||
+    answer === "apk" ||
+    answer === "direct" ||
+    answer === "direct install" ||
+    answer === "2"
+  ) {
+    return "install";
+  }
+  return null;
+}
+
+function shouldPromptForProductionTarget(envName, platform, apk) {
+  return envName === "production" && platform === "android" && !apk;
+}
+
+async function promptForProductionTarget() {
+  if (isCiEnvironment()) {
+    console.log("[build] production target skipped (CI); using Play Store AAB");
+    return false;
+  }
+
+  const question = formatProductionTargetPrompt();
+  for (;;) {
+    const io = openPromptIo();
+    if (!io) {
+      console.log("[build] production target skipped (non-interactive); using Play Store AAB");
+      return false;
+    }
+    const target = parseProductionTargetAnswer(await askQuestion(question, io));
+    if (target === "store") {
+      console.log("[build] Play Store build (AAB)");
+      return false;
+    }
+    if (target === "install") {
+      console.log("[build] direct install build (APK)");
+      return true;
+    }
+    console.error("[build] Enter store or install.");
+  }
+}
+
 function resolveEasProfile(envName, apk) {
   if (envName === "local") {
     return "development";
@@ -124,15 +193,20 @@ async function main() {
     usage(err.message);
     return;
   }
-  const { envName, platform, apk, passthrough } = parsed;
+  const { envName, platform, passthrough } = parsed;
+  let { apk } = parsed;
   if (apk && envName !== "production") {
     console.warn("[build] --apk is only used for production (profile production-apk); ignoring.");
+    apk = false;
+  }
+  if (shouldPromptForProductionTarget(envName, platform, apk)) {
+    apk = await promptForProductionTarget();
   }
 
   const bumpResult = await autoBumpForPackagedBuild(envName);
   const meta = prepareBuildMetadata(envName);
   const version = meta.version || resolveAppVersion(envName);
-  const profile = resolveEasProfile(envName, apk && envName === "production");
+  const profile = resolveEasProfile(envName, apk);
 
   const easArgs = [
     "eas-cli",
@@ -171,5 +245,7 @@ if (require.main === module) {
 
 module.exports = {
   parseArgs,
+  parseProductionTargetAnswer,
   resolveEasProfile,
+  shouldPromptForProductionTarget,
 };
