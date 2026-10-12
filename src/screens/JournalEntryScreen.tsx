@@ -18,7 +18,9 @@ import {
   voucherLabel,
 } from "../utils/accounting";
 import { formatDate } from "../utils/dates";
-import { formatInr } from "../utils/money";
+import { formatInr, formatMoney } from "../utils/money";
+import { readInvoiceCurrencyAmount } from "../shared/tax/taxApiKeys";
+import useTaxRegime from "../hooks/useTaxRegime";
 
 type Props = NativeStackScreenProps<RootStackParamList, "JournalEntry">;
 
@@ -29,6 +31,7 @@ export default function JournalEntryScreen({ navigation, route }: Props) {
   const { allows, loading: rbacLoading } = useRbac();
   const canView = allows("gl", "view");
   const canOpenLedger = allows("ledger", "view");
+  const { baseCurrency } = useTaxRegime();
   const [entry, setEntry] = useState<JournalEntryDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -121,6 +124,8 @@ export default function JournalEntryScreen({ navigation, route }: Props) {
               <LineRow
                 key={line.id}
                 line={line}
+                invoiceCurrency={entry.invoice_currency || baseCurrency}
+                baseCurrency={baseCurrency}
                 canOpen={canOpenLedger && Boolean(line.account?.id)}
                 onPress={() => {
                   if (line.account?.id) {
@@ -151,16 +156,22 @@ function Total({ label, value }: { label: string; value: string }) {
 
 function LineRow({
   line,
+  invoiceCurrency,
+  baseCurrency,
   canOpen,
   onPress,
 }: {
   line: JournalLineDetail;
+  invoiceCurrency: string;
+  baseCurrency: string;
   canOpen: boolean;
   onPress: () => void;
 }) {
   const { colors } = useAppTheme();
   const styles = useThemedStyles(createStyles);
   const title = line.account?.title || "Unknown ledger";
+  const forex = readInvoiceCurrencyAmount(line as Record<string, unknown>);
+  const showForex = forex != null && invoiceCurrency.toUpperCase() !== baseCurrency.toUpperCase();
   const body = (
     <>
       <View style={styles.lineCopy}>
@@ -168,6 +179,11 @@ function LineRow({
         {line.line_narration ? <Text style={styles.lineMeta}>{line.line_narration}</Text> : null}
         {line.account?.statutory_code ? (
           <Text style={styles.lineMeta}>{line.account.statutory_code}</Text>
+        ) : null}
+        {showForex ? (
+          <Text style={styles.lineMeta}>
+            Invoice currency {formatMoney(forex, invoiceCurrency)}
+          </Text>
         ) : null}
       </View>
       <View style={styles.lineAmounts}>

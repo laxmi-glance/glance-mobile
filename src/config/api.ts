@@ -1,4 +1,5 @@
 import axios, { AxiosError, AxiosHeaders, InternalAxiosRequestConfig } from "axios";
+import Constants from "expo-constants";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_BASE_URL, API_TIMEOUT_MS } from "./env";
 import {
@@ -8,7 +9,8 @@ import {
   getRefreshToken,
   setTokenPair,
 } from "../core/storage";
-import { notifySessionExpired } from "../core/sessionEvents";
+import { notifySessionExpired, notifyTenantChanged } from "../core/sessionEvents";
+import { clearTaxRegimeCache } from "../shared/tax/taxRegimeCache";
 import type { TokenPair } from "../types/models";
 
 function isFormDataBody(data: unknown): boolean {
@@ -33,11 +35,15 @@ const PUBLIC_PATHS = [
 
 type RetryConfig = InternalAxiosRequestConfig & { _retry?: boolean };
 
+const MOBILE_APP_VERSION = Constants.expoConfig?.version ?? "1.0.0";
+
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: API_TIMEOUT_MS,
   headers: {
     Accept: "application/json",
+    "X-Glance-Client": "mobile",
+    "X-Glance-Client-Version": MOBILE_APP_VERSION,
   },
 });
 
@@ -103,6 +109,8 @@ async function refreshAccessToken(): Promise<string | null> {
 
 async function forceSignOut(): Promise<void> {
   await clearSession();
+  clearTaxRegimeCache();
+  notifyTenantChanged(null);
   notifySessionExpired();
 }
 
