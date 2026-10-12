@@ -23,9 +23,14 @@ import { useRbac } from "../hooks/useRbac";
 import { space, useAppTheme, useThemedStyles, type ThemeTokens } from "../theme";
 import Screen from "../components/Screen";
 import PageHeader from "../components/PageHeader";
+import TaxBreakdown from "../components/tax/TaxBreakdown";
+import { readBillToTaxId, readIndirectTaxId } from "../shared/tax/taxApiKeys";
+import { usePartyTaxDisplayRows } from "../utils/partyTaxDisplay";
+import useTaxRegime from "../hooks/useTaxRegime";
 import EmptyState from "../components/EmptyState";
 
 export default function ApDocumentScreen({ route, navigation }: ApDocumentScreenProps) {
+  const { jurisdiction: taxJurisdiction } = useTaxRegime();
   const { colors } = useAppTheme();
   const styles = useThemedStyles(createStyles);
   const { documentId } = route.params;
@@ -239,14 +244,17 @@ export default function ApDocumentScreen({ route, navigation }: ApDocumentScreen
           </Card>
         ) : null}
 
-        {amountRows.length ? (
+        {amountRows.length || hasCalculatedTaxComponents(document, taxJurisdiction) ? (
           <Card style={styles.section}>
             <Text style={styles.sectionTitle}>Amounts</Text>
             {amountRows.map((row) => (
               <InfoRow key={row.label} label={row.label} value={row.value} />
             ))}
+            <DocumentTaxBreakdown document={document} currency={currency} />
           </Card>
         ) : null}
+
+        <DocumentPartyTax document={document} />
 
         {parentItems.length ? (
           <Card style={styles.section}>
@@ -301,6 +309,62 @@ export default function ApDocumentScreen({ route, navigation }: ApDocumentScreen
         />
       </ScrollView>
     </Screen>
+  );
+}
+
+function hasCalculatedTaxComponents(
+  document: FinancialDocumentDetail,
+  jurisdiction: string
+): boolean {
+  // India keeps today's screen; regimes without a CGST/SGST/IGST split show their own components.
+  return (
+    jurisdiction !== "IN" &&
+    Array.isArray(document.calculated_tax_components) &&
+    document.calculated_tax_components.some((row) => row && Number(row.amount) !== 0)
+  );
+}
+
+function DocumentTaxBreakdown({
+  document,
+  currency,
+}: {
+  document: FinancialDocumentDetail;
+  currency: string;
+}) {
+  const { jurisdiction } = useTaxRegime();
+  if (!hasCalculatedTaxComponents(document, jurisdiction)) {
+    return null;
+  }
+  return (
+    <View style={{ marginTop: 8 }}>
+      <TaxBreakdown components={document.calculated_tax_components ?? null} currency={currency} />
+    </View>
+  );
+}
+
+function DocumentPartyTax({ document }: { document: FinancialDocumentDetail }) {
+  const styles = useThemedStyles(createStyles);
+  const party = document.party ?? document.suggested_party;
+  const partyTaxRows = usePartyTaxDisplayRows(party);
+  const { taxIdFormats, jurisdiction } = useTaxRegime();
+  const billToLabel = taxIdFormats.indirect_tax_id?.label ?? "Bill-to tax ID";
+  const billTo = readBillToTaxId(document);
+  const partyIndirect = readIndirectTaxId(party);
+  const showBillTo = Boolean(billTo) && billTo !== partyIndirect;
+  const rows = [...partyTaxRows];
+  if (showBillTo) {
+    rows.push({ label: billToLabel, value: billTo });
+  }
+  if (jurisdiction === "IN" || !rows.length) {
+    return null;
+  }
+  return (
+    <Card style={styles.section}>
+      <Text style={styles.sectionTitle}>Tax identifiers</Text>
+      {rows.map((row) => (
+        <InfoRow key={row.label} label={row.label} value={row.value} />
+      ))}
+    </Card>
   );
 }
 

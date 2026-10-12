@@ -29,6 +29,8 @@ import {
 } from "../utils/accounting";
 import { formatDate } from "../utils/dates";
 import { humanizeKey } from "../utils/money";
+import useTaxRegime from "../hooks/useTaxRegime";
+import { readWithholdingSectionCode } from "../shared/tax/taxApiKeys";
 
 type Props = NativeStackScreenProps<RootStackParamList, "LedgerAccount">;
 
@@ -39,6 +41,7 @@ export default function LedgerAccountScreen({ navigation, route }: Props) {
   const { allows, loading: rbacLoading } = useRbac();
   const canViewLedger = allows("ledger", "view");
   const canViewGl = allows("gl", "view");
+  const { labels } = useTaxRegime();
   const { range, presets, setRange, ready } = useReportRange("range");
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
@@ -113,7 +116,7 @@ export default function LedgerAccountScreen({ navigation, route }: Props) {
   );
 
   const heading = account?.title || title || "Ledger";
-  const facts = accountFacts(account);
+  const facts = accountFacts(account, labels.withholding_tax ?? "TDS");
 
   return (
     <Screen edges={[]}>
@@ -265,7 +268,10 @@ export default function LedgerAccountScreen({ navigation, route }: Props) {
   );
 }
 
-function accountFacts(account: LedgerAccount | null): { label: string; value: string }[] {
+function accountFacts(
+  account: LedgerAccount | null,
+  withholdingLabel: string
+): { label: string; value: string }[] {
   if (!account) {
     return [];
   }
@@ -278,8 +284,12 @@ function accountFacts(account: LedgerAccount | null): { label: string; value: st
     { label: "Tax rate", value: tax },
     { label: "GST type", value: account.gst_type ? humanizeKey(account.gst_type) : "" },
     {
-      label: "TDS",
-      value: account.tds_ledger_detail?.section_name || account.tds_ledger_detail?.section_id || "",
+      label: withholdingLabel,
+      value:
+        account.tds_ledger_detail?.section_name ||
+        readWithholdingSectionCode(account.tds_ledger_detail ?? undefined) ||
+        account.tds_ledger_detail?.payable_ledger_name ||
+        "",
     },
     { label: "Source", value: account.source_system ? humanizeKey(account.source_system) : "" },
     { label: "Description", value: account.description || "" },

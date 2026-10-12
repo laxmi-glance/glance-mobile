@@ -62,6 +62,8 @@ export interface PartyBrief {
   alias?: string | null;
   gstin?: string | null;
   pan_number?: string | null;
+  indirect_tax_id?: string | null;
+  income_tax_id?: string | null;
 }
 
 export interface UserBrief {
@@ -108,6 +110,8 @@ export interface FinancialDocumentItem {
   total?: string | number | null;
   line_total?: string | number | null;
   base_amount?: string | number | null;
+  base_currency_amount?: string | number | null;
+  invoice_currency_amount?: string | number | null;
   gst_rate?: string | number | null;
   gst_amount?: string | number | null;
   tds_amount?: string | number | null;
@@ -127,6 +131,12 @@ export interface DocumentApproval {
   approved_by?: UserBrief | null;
 }
 
+export type CalculatedTaxComponent = {
+  code?: string;
+  label?: string;
+  amount?: string | number | null;
+};
+
 export interface FinancialDocumentDetail extends FinancialDocumentListItem {
   due_date?: string | null;
   amount?: string | number | null;
@@ -135,6 +145,9 @@ export interface FinancialDocumentDetail extends FinancialDocumentListItem {
   approval_at?: string | null;
   document_approval?: DocumentApproval | null;
   items?: FinancialDocumentItem[];
+  bill_to_gstin?: string | null;
+  bill_to_tax_id?: string | null;
+  calculated_tax_components?: CalculatedTaxComponent[] | null;
 }
 
 export interface FinancialDocumentStats {

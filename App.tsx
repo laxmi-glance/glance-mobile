@@ -41,6 +41,7 @@ import JournalEntryScreen from "./src/screens/JournalEntryScreen";
 import ScannerScreen from "./src/screens/ScannerScreen";
 import MainTabs from "./src/navigation/MainTabs";
 import rbacService from "./src/services/rbac.service";
+import { TaxRegimeProvider } from "./src/shared/tax/TaxRegimeContext";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const BACKGROUND_LOCK_MS = 45_000;
@@ -150,16 +151,21 @@ export default function App() {
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
         <ThemeProvider>
-          {showSplash ? (
-            <Splash />
-          ) : (
-            <>
-              <ThemedNavigation navigationRef={navigationRef} initialRoute={initialRoute} />
-              {locked ? (
-                <BiometricLock onUnlock={unlock} onSignInElsewhere={() => void signInElsewhere()} />
-              ) : null}
-            </>
-          )}
+          <TaxRegimeProvider>
+            {showSplash ? (
+              <Splash />
+            ) : (
+              <>
+                <ThemedNavigation navigationRef={navigationRef} initialRoute={initialRoute} />
+                {locked ? (
+                  <BiometricLock
+                    onUnlock={unlock}
+                    onSignInElsewhere={() => void signInElsewhere()}
+                  />
+                ) : null}
+              </>
+            )}
+          </TaxRegimeProvider>
         </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

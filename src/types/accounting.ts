@@ -30,6 +30,7 @@ export type LedgerAccount = {
   gst_type?: string | null;
   ledger_group?: LedgerGroup | null;
   tds_ledger_detail?: {
+    code?: string | null;
     section_id?: string | null;
     section_name?: string | null;
     payable_ledger_name?: string | null;
@@ -56,6 +57,8 @@ export type JournalLineDetail = {
   id: string;
   debit_amount?: string | number | null;
   credit_amount?: string | number | null;
+  base_currency_amount?: string | number | null;
+  invoice_currency_amount?: string | number | null;
   line_narration?: string | null;
   position?: number | null;
   account?: {

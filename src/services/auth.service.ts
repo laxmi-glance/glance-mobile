@@ -10,6 +10,8 @@ import {
   setTokenPair,
 } from "../core/storage";
 import { userIdFromAccessToken } from "../utils/jwt";
+import { notifyTenantChanged } from "../core/sessionEvents";
+import { clearTaxRegimeCache } from "../shared/tax/fetchTaxRegime";
 import rbacService from "./rbac.service";
 import type { LoginResponse, Tenant, TokenPair, UserProfile } from "../types/models";
 
@@ -26,6 +28,8 @@ class AuthService {
     await AsyncStorage.removeItem(StorageKeys.selectedTenant);
     await AsyncStorage.removeItem(StorageKeys.rbacConfig);
     await setJson(StorageKeys.availableTenants, data.tenants ?? []);
+    clearTaxRegimeCache();
+    notifyTenantChanged(null);
   }
 
   async selectTenant(tenantId: string): Promise<TokenPair> {
@@ -49,6 +53,9 @@ class AuthService {
 
     await rbacService.sync().catch(() => undefined);
 
+    clearTaxRegimeCache(tenantId);
+    notifyTenantChanged(tenantId);
+
     return data;
   }
 
@@ -67,6 +74,8 @@ class AuthService {
       // Honor local logout even if the blacklist call fails (expired token, offline).
     } finally {
       await clearSession();
+      clearTaxRegimeCache();
+      notifyTenantChanged(null);
     }
   }
 
