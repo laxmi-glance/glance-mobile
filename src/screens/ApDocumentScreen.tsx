@@ -27,6 +27,7 @@ import TaxBreakdown from "../components/tax/TaxBreakdown";
 import { readBillToTaxId, readIndirectTaxId } from "../shared/tax/taxApiKeys";
 import { usePartyTaxDisplayRows } from "../utils/partyTaxDisplay";
 import useTaxRegime from "../hooks/useTaxRegime";
+import EmptyState from "../components/EmptyState";
 
 export default function ApDocumentScreen({ route, navigation }: ApDocumentScreenProps) {
   const { jurisdiction: taxJurisdiction } = useTaxRegime();
@@ -34,6 +35,7 @@ export default function ApDocumentScreen({ route, navigation }: ApDocumentScreen
   const styles = useThemedStyles(createStyles);
   const { documentId } = route.params;
   const rbac = useRbac();
+  const { canViewAp, loading: rbacLoading } = rbac;
   const [document, setDocument] = useState<FinancialDocumentDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [actingOn, setActingOn] = useState<"approved" | "rejected" | null>(null);
@@ -69,8 +71,15 @@ export default function ApDocumentScreen({ route, navigation }: ApDocumentScreen
   );
 
   useEffect(() => {
-    void loadDocument(); // eslint-disable-line react-hooks/set-state-in-effect -- load document after async API call
-  }, [loadDocument]);
+    if (rbacLoading) {
+      return;
+    }
+    if (!canViewAp) {
+      setLoading(false); // eslint-disable-line react-hooks/set-state-in-effect -- nothing to load without permission
+      return;
+    }
+    void loadDocument();
+  }, [canViewAp, loadDocument, rbacLoading]);
 
   const submit = async (status: "approved" | "rejected", remarks?: string) => {
     if (!document) {
@@ -95,7 +104,26 @@ export default function ApDocumentScreen({ route, navigation }: ApDocumentScreen
     }
   };
 
-  if (loading || !document) {
+  if (!rbacLoading && !canViewAp) {
+    return (
+      <Screen edges={["bottom"]}>
+        <PageHeader
+          title="Document"
+          subtitle="Payable details"
+          icon="receipt-outline"
+          showBack
+          onBack={() => navigation.goBack()}
+        />
+        <EmptyState
+          icon="lock-closed-outline"
+          title="Documents are not available"
+          hint="Your role cannot view documents in this workspace."
+        />
+      </Screen>
+    );
+  }
+
+  if (loading || rbacLoading || !document) {
     return (
       <Screen edges={["bottom"]}>
         <PageHeader

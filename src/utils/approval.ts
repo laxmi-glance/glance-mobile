@@ -104,9 +104,6 @@ export function canActOnApproval(
   role: string | null | undefined,
   username?: string | null
 ): ApprovalActionGate {
-  if (role === "sales_manager") {
-    return denied("Forwarding for approval is available on the web app.");
-  }
   if (!canApproveFinancialDocuments(config, role)) {
     return denied();
   }
@@ -119,6 +116,9 @@ export function canActOnApproval(
   const isOwnDoc = Boolean(username && doc.created_by && doc.created_by === username);
   if (isOwnDoc && !rbacAllows(config, role, "financial_document", "self_approve")) {
     return denied("You cannot approve a document you uploaded.");
+  }
+  if (!isOwnDoc && !rbacAllows(config, role, "financial_document", "approve")) {
+    return denied();
   }
   if (doc.approval_status === "approved") {
     return { canApprove: false, canReject: true };

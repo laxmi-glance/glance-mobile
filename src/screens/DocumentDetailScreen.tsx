@@ -12,11 +12,14 @@ import { apiErrorMessage } from "../utils/errors";
 import { space, useAppTheme, useThemedStyles, type ThemeTokens } from "../theme";
 import Screen from "../components/Screen";
 import PageHeader from "../components/PageHeader";
+import EmptyState from "../components/EmptyState";
+import { useRbac } from "../hooks/useRbac";
 
 export default function DocumentDetailScreen({ route, navigation }: DocumentDetailScreenProps) {
   const { colors } = useAppTheme();
   const styles = useThemedStyles(createStyles);
   const { documentId } = route.params;
+  const { canReadDocumentProcessor, canWriteDocumentProcessor, loading: rbacLoading } = useRbac();
   const [document, setDocument] = useState<PreprocessingDocument | null>(null);
   const [loading, setLoading] = useState(true);
   const [retrying, setRetrying] = useState(false);
@@ -51,8 +54,15 @@ export default function DocumentDetailScreen({ route, navigation }: DocumentDeta
   );
 
   useEffect(() => {
-    void loadDocument(); // eslint-disable-line react-hooks/set-state-in-effect -- load document after async API call
-  }, [loadDocument]);
+    if (rbacLoading) {
+      return;
+    }
+    if (!canReadDocumentProcessor) {
+      setLoading(false); // eslint-disable-line react-hooks/set-state-in-effect -- nothing to load without permission
+      return;
+    }
+    void loadDocument();
+  }, [canReadDocumentProcessor, loadDocument, rbacLoading]);
 
   const handleRetry = () => {
     if (!document) {
@@ -78,7 +88,26 @@ export default function DocumentDetailScreen({ route, navigation }: DocumentDeta
     ]);
   };
 
-  if (loading || !document) {
+  if (!rbacLoading && !canReadDocumentProcessor) {
+    return (
+      <Screen edges={["bottom"]}>
+        <PageHeader
+          title="Processing"
+          subtitle="Document status"
+          icon="sync-outline"
+          showBack
+          onBack={() => navigation.goBack()}
+        />
+        <EmptyState
+          icon="lock-closed-outline"
+          title="Processing queue is not available"
+          hint="Your role cannot view document processing in this workspace."
+        />
+      </Screen>
+    );
+  }
+
+  if (loading || rbacLoading || !document) {
     return (
       <Screen edges={["bottom"]}>
         <PageHeader
@@ -175,7 +204,7 @@ export default function DocumentDetailScreen({ route, navigation }: DocumentDeta
           />
         ) : null}
 
-        {canRetry(document) ? (
+        {canWriteDocumentProcessor && canRetry(document) ? (
           <Button
             label="Retry processing"
             icon="refresh-outline"

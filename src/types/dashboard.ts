@@ -44,8 +44,6 @@ export type UserPreferences = {
 };
 
 export type DashboardPerms = {
-  role: string;
-  isOwnerOrAdmin: boolean;
   canApprove: boolean;
   canUpload: boolean;
   canViewStatutoryReports: boolean;
@@ -53,10 +51,14 @@ export type DashboardPerms = {
   canViewGlList: boolean;
   canViewGl: boolean;
   canViewApInsights: boolean;
-  canViewArInsights: boolean;
   canAccessDocProcessing: boolean;
   canViewTds: boolean;
   canViewFinancialDashboard: boolean;
+  canViewActionItems: boolean;
+  canViewInventorySummary: boolean;
+  canViewTopVendors: boolean;
+  canViewTopCustomers: boolean;
+  canAccessConsolidated: boolean;
 };
 
 export type ActionItem = {
