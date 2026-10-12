@@ -31,7 +31,7 @@ import { radius, space, useAppTheme, useThemedStyles, type ThemeTokens } from ".
 export default function ApListScreen({ navigation }: ApScreenProps) {
   const { colors } = useAppTheme();
   const styles = useThemedStyles(createStyles);
-  const { canViewAp, config, loading: rbacLoading } = useRbac();
+  const { canViewAp, canReadDocumentProcessor, loading: rbacLoading } = useRbac();
   const [documents, setDocuments] = useState<FinancialDocumentListItem[]>([]);
   const [stats, setStats] = useState<FinancialDocumentStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -51,6 +51,9 @@ export default function ApListScreen({ navigation }: ApScreenProps) {
 
   const loadDocuments = useCallback(
     async (pageNum = 1, replace = false, query = searchRef.current) => {
+      if (rbacLoading || !canViewAp) {
+        return;
+      }
       const isReplace = replace || pageNum === 1;
       if (isReplace) {
         fetchGen.current += 1;
@@ -89,15 +92,15 @@ export default function ApListScreen({ navigation }: ApScreenProps) {
         setLoadingMore(false);
       }
     },
-    [approvalStatus]
+    [approvalStatus, canViewAp, rbacLoading]
   );
 
   useEffect(() => {
-    if (rbacLoading) {
+    if (rbacLoading || !canViewAp) {
       return;
     }
     void loadDocuments(1, true);
-  }, [loadDocuments, rbacLoading]);
+  }, [canViewAp, loadDocuments, rbacLoading]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -121,7 +124,22 @@ export default function ApListScreen({ navigation }: ApScreenProps) {
     navigation.navigate("ApDocument", { documentId: item.id });
   };
 
-  if (!rbacLoading && config && !canViewAp) {
+  if (rbacLoading) {
+    return (
+      <Screen edges={[]}>
+        <PageHeader
+          title="Documents"
+          subtitle="Processed Documents list"
+          icon="documents-outline"
+        />
+        <View style={styles.overlay}>
+          <ActivityIndicator size="large" color={colors.brand} />
+        </View>
+      </Screen>
+    );
+  }
+
+  if (!canViewAp) {
     return (
       <Screen edges={[]}>
         <PageHeader
@@ -144,9 +162,11 @@ export default function ApListScreen({ navigation }: ApScreenProps) {
         title="Documents"
         subtitle="Processed Documents list"
         icon="documents-outline"
-        supportingIcon="file-tray-full-outline"
+        supportingIcon={canReadDocumentProcessor ? "file-tray-full-outline" : undefined}
         supportingAccessibilityLabel="Open processing queue"
-        onSupportingPress={() => navigation.navigate("Queue")}
+        onSupportingPress={
+          canReadDocumentProcessor ? () => navigation.navigate("Queue") : undefined
+        }
         menuActions={[
           {
             key: "refresh",
@@ -234,7 +254,7 @@ export default function ApListScreen({ navigation }: ApScreenProps) {
         }
       />
 
-      {loading || rbacLoading ? (
+      {loading ? (
         <View style={styles.overlay}>
           <ActivityIndicator size="large" color={colors.brand} />
         </View>

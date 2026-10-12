@@ -236,6 +236,9 @@ export default function DashboardFeed({
         );
       }
       case "actionInbox": {
+        if (!perms.canViewActionItems) {
+          return null;
+        }
         const items = secondary.actionItems.data;
         return (
           <WidgetCard title="Needs attention" icon="alert-circle-outline">
@@ -320,6 +323,9 @@ export default function DashboardFeed({
       }
 
       case "myWork": {
+        if (!perms.canViewActionItems || !(perms.canApprove || perms.canAccessDocProcessing)) {
+          return null;
+        }
         const payload = secondary.myPendingApprovals.data;
         const items = payload?.items || [];
         const total = payload?.total ?? items.length;
@@ -486,7 +492,7 @@ export default function DashboardFeed({
       }
 
       case "cashFlowTrend": {
-        if (!perms.canViewBanking) {
+        if (!perms.canViewBanking && !perms.canViewFinancialDashboard) {
           return null;
         }
         const data = secondary.cashFlowTrend.data;
@@ -515,6 +521,9 @@ export default function DashboardFeed({
       }
 
       case "workingCapital": {
+        if (!perms.canViewFinancialDashboard) {
+          return null;
+        }
         const data = secondary.workingCapital.data;
         if (!data) {
           return (
@@ -549,6 +558,9 @@ export default function DashboardFeed({
       }
 
       case "compliance": {
+        if (!perms.canViewFinancialDashboard) {
+          return null;
+        }
         const events = secondary.complianceEvents.data.slice(0, 5);
         return (
           <WidgetCard title="Compliance calendar" icon="calendar-outline">
@@ -569,7 +581,7 @@ export default function DashboardFeed({
       }
 
       case "tdsSummary": {
-        if (!perms.canViewTds) {
+        if (!perms.canViewTds && !perms.canViewFinancialDashboard) {
           return null;
         }
         const data = secondary.tdsSummary.data;
@@ -600,6 +612,9 @@ export default function DashboardFeed({
       }
 
       case "priorYearBenchmark": {
+        if (!perms.canViewFinancialDashboard) {
+          return null;
+        }
         const data = secondary.priorYearBenchmark.data;
         return (
           <WidgetCard title="Prior year benchmark" icon="analytics-outline">
@@ -628,6 +643,9 @@ export default function DashboardFeed({
       }
 
       case "inventorySummary": {
+        if (!perms.canViewInventorySummary) {
+          return null;
+        }
         const data = secondary.inventorySummary.data;
         if (!data || data.enabled === false) {
           return null;
@@ -697,7 +715,7 @@ export default function DashboardFeed({
       }
 
       case "topVendors":
-        if (!perms.canViewApInsights) {
+        if (!perms.canViewTopVendors) {
           return null;
         }
         return (
@@ -710,7 +728,7 @@ export default function DashboardFeed({
         );
 
       case "topCustomers":
-        if (!perms.canViewArInsights) {
+        if (!perms.canViewTopCustomers) {
           return null;
         }
         return (
@@ -723,6 +741,9 @@ export default function DashboardFeed({
         );
 
       case "sync": {
+        if (!perms.canViewStatutoryReports) {
+          return null;
+        }
         const pending = num(secondary.erpSync.data?.pending_count ?? secondary.erpSync.data?.count);
         return (
           <WidgetCard title="ERP sync" icon="sync-outline">
@@ -735,6 +756,9 @@ export default function DashboardFeed({
       }
 
       case "aiAccuracy": {
+        if (!perms.canAccessDocProcessing) {
+          return null;
+        }
         const stats = secondary.recommendationStats.data;
         const nestedStats = nested(stats, "statistics");
         const rate = num(stats?.acceptance_rate ?? nestedStats?.accuracy_percentage);
@@ -754,6 +778,9 @@ export default function DashboardFeed({
       }
 
       case "activityFeed": {
+        if (!perms.canViewStatutoryReports) {
+          return null;
+        }
         const items = secondary.userActivity.data.slice(0, 5);
         return (
           <WidgetCard title="Recent activity" icon="time-outline">
@@ -779,6 +806,9 @@ export default function DashboardFeed({
       }
 
       case "team": {
+        if (!perms.canViewStatutoryReports) {
+          return null;
+        }
         const metrics = complete?.user_activity_metrics;
         if (!metrics) {
           return null;
