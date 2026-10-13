@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Glancewise — agent test policy
 
-Tests run in tiers. **Audits run Tier 0 (affected tests only).** CI runs the full unit suite on every PR and push to `dev` (backend, frontend, mobile; connector runs but is non-blocking for now). Say in your report which tests you ran and that the full suite is left to CI — don't claim the change is fully tested.
+Tests run in tiers. **Audits run Tier 0 (affected tests only).** CI runs the full unit suite on every PR and push to `dev` (backend, frontend, mobile, connector unit tests). Say in your report which tests you ran and that the full suite is left to CI — don't claim the change is fully tested.
 
 | Tier | When | Where |
 |------|------|-------|
