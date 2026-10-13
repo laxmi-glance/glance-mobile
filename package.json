@@ -37,6 +37,8 @@
     "build:ios:production": "node scripts/build.js production --platform=ios",
     "test": "jest --watchAll=false && node tests/versionTools.test.js",
     "test:watch": "jest --watch",
+    "test:changed": "jest --watchAll=false --maxWorkers=2 --changedSince=origin/dev",
+    "test:audit": "jest --watchAll=false --maxWorkers=2",
     "test:version-tools": "node tests/versionTools.test.js",
     "lint": "eslint .",
     "lint:check": "eslint .",

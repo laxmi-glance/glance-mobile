@@ -1,0 +1,25 @@
+---
+description: Test tiers for code audits — affected tests by default, full suite only on escalation; CI runs the full suite on every PR
+alwaysApply: true
+---
+
+# Glancewise — agent test policy
+
+Tests run in tiers. **Audits run Tier 0 (affected tests only).** CI runs the full unit suite on every PR and push to `dev` (backend, frontend, mobile; connector runs but is non-blocking for now). Say in your report which tests you ran and that the full suite is left to CI — don't claim the change is fully tested.
+
+| Tier | When | Where |
+|------|------|-------|
+| 0 — affected tests | Every audit | Locally (commands below) |
+| 1 — full unit suite | Every PR / push to `dev` | CI; locally only on escalation |
+| 2 — E2E, coverage, benchmarks | Nightly / on demand | CI; locally only if the user asks |
+
+Escalate to the full suite locally only when the user asks, or the change touches shared foundations (listed per repo below). Otherwise report which tests ran and note that CI runs the rest.
+
+Never put `--` between a pnpm script and its flags (`pnpm test:changed --listTests`, not `pnpm test:changed -- --listTests`): pnpm forwards the `--` and Jest/Playwright then ignore the flags.
+
+## glance-mobile (Jest / jest-expo)
+
+- **Tier 0:** `pnpm test:changed`, or `pnpm test:audit --findRelatedTests <file>`.
+- **Full suite (escalation):** `pnpm test:audit`. `pnpm test` mirrors CI.
+- **Escalate when touching:** navigation/store setup, shared test setup, `package.json`, `app.json`/Expo config.
+- **Never during audits:** `pnpm test:watch`.

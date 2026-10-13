@@ -69,3 +69,7 @@ local.properties
 
 # Logs
 *.log
+
+# Cursor: share agent rules, keep personal editor state local
+.cursor/*
+!.cursor/rules/
