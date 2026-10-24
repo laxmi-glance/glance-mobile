@@ -30,6 +30,7 @@ const {
   parseArgs,
   parseProductionTargetAnswer,
   resolveEasProfile,
+  resolveNpxLaunch,
   shouldPromptForProductionTarget,
 } = require("../scripts/build");
 
@@ -483,6 +484,23 @@ function testBuildArgParsing() {
   assert(threw, "missing --platform value throws");
 }
 
+function testNpxLaunchAvoidsCmdSpawn() {
+  const launch = resolveNpxLaunch(["eas-cli", "--version"]);
+  if (process.platform === "win32") {
+    const spawnsCmdWithoutShell = launch.command === "npx.cmd" && launch.shell !== true;
+    assert(!spawnsCmdWithoutShell, "windows does not spawn npx.cmd with shell disabled");
+    if (launch.command === process.execPath) {
+      assertEq(launch.shell, false, "npx-cli.js does not need a shell");
+      assert(String(launch.args[0]).endsWith(`${path.sep}npx-cli.js`), "launches npx-cli.js");
+      assertEq(launch.args.slice(1).join(" "), "eas-cli --version", "npx args preserved");
+    }
+    return;
+  }
+  assertEq(launch.command, "npx", "unix npx");
+  assertEq(launch.shell, false, "unix npx does not use a shell");
+  assertEq(launch.args.join(" "), "eas-cli --version", "unix npx args preserved");
+}
+
 function testCliRequiresEnv() {
   const before = readPkgVersion();
   const envRaw = snapshotEnvVersions();
@@ -523,6 +541,7 @@ async function run() {
   testEnvVersionsAreIndependent();
   testReadEnvVersionsFailsClosed();
   testBuildArgParsing();
+  testNpxLaunchAvoidsCmdSpawn();
   testCliRequiresEnv();
   await testAutoBumpSkipFlags();
   await testAutoBumpPromptConfirm();

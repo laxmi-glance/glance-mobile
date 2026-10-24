@@ -23,6 +23,7 @@
  */
 "use strict";
 
+const fs = require("fs");
 const path = require("path");
 const { spawnSync } = require("child_process");
 const {
@@ -164,15 +165,31 @@ function resolveEasProfile(envName, apk) {
   return apk ? "production-apk" : "production";
 }
 
-function resolveNpxCommand() {
-  return process.platform === "win32" ? "npx.cmd" : "npx";
+function resolveNpxLaunch(npxArgs) {
+  if (process.platform !== "win32") {
+    return { command: "npx", args: npxArgs, shell: false };
+  }
+
+  // Node 20.12+ / 22 returns EINVAL if a .cmd file is spawned with shell:false.
+  const npxCli = path.join(
+    path.dirname(process.execPath),
+    "node_modules",
+    "npm",
+    "bin",
+    "npx-cli.js"
+  );
+  if (fs.existsSync(npxCli)) {
+    return { command: process.execPath, args: [npxCli, ...npxArgs], shell: false };
+  }
+
+  return { command: "npx.cmd", args: npxArgs, shell: true };
 }
 
 function run(command, args, opts = {}) {
   const result = spawnSync(command, args, {
     cwd: root,
     stdio: "inherit",
-    shell: false,
+    shell: opts.shell === true,
     env: opts.env || process.env,
     windowsHide: true,
   });
@@ -226,7 +243,9 @@ async function main() {
     console.log("[build] Commit env-versions.json with this release.");
   }
 
-  run(resolveNpxCommand(), easArgs, {
+  const launch = resolveNpxLaunch(easArgs);
+  run(launch.command, launch.args, {
+    shell: launch.shell,
     env: {
       ...process.env,
       EXPO_PUBLIC_API_ENV: envName,
@@ -247,5 +266,6 @@ module.exports = {
   parseArgs,
   parseProductionTargetAnswer,
   resolveEasProfile,
+  resolveNpxLaunch,
   shouldPromptForProductionTarget,
 };
