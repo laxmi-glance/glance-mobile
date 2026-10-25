@@ -12,6 +12,14 @@ import { WebView } from "react-native-webview";
 import * as FileSystem from "expo-file-system/legacy";
 import { PAYABLE_PREVIEW_CACHE_NAME } from "../core/storage";
 import { radius, useAppTheme, useThemedStyles, type ThemeTokens } from "../theme";
+import {
+  INLINE_PREVIEW_BASE_URL,
+  PREVIEW_ORIGIN_WHITELIST,
+  createPreviewNavigationGuard,
+  inlinePreviewNavigationGuard,
+  pdfHtml,
+} from "./documentPreviewHtml";
+import { loadPdfJsSources } from "./pdfJsBundle";
 
 type Props = {
   url: string;
@@ -30,45 +38,7 @@ function isImageSource(url: string, fileName?: string | null): boolean {
   return /\.(png|jpe?g|gif|webp|heic|heif|bmp)(?:$|\?|#)/i.test(target);
 }
 
-function pdfHtml(base64: string): string {
-  return `<!DOCTYPE html>
-<html>
-  <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=4" />
-    <style>
-      html, body { margin: 0; padding: 0; background: #f4f5f9; }
-      canvas { display: block; width: 100%; margin: 0 0 12px; background: #fff; }
-    </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-  </head>
-  <body>
-    <div id="pages"></div>
-    <script>
-      pdfjsLib.disableWorker = true;
-      const raw = atob("${base64}");
-      const bytes = new Uint8Array(raw.length);
-      for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
-      const host = document.getElementById("pages");
-      pdfjsLib.getDocument({ data: bytes }).promise.then(async (pdf) => {
-        const scale = (window.innerWidth / 612) * 1.15;
-        for (let n = 1; n <= pdf.numPages; n++) {
-          const page = await pdf.getPage(n);
-          const viewport = page.getViewport({ scale: Math.max(scale, 1.1) });
-          const canvas = document.createElement("canvas");
-          const context = canvas.getContext("2d");
-          canvas.width = viewport.width;
-          canvas.height = viewport.height;
-          host.appendChild(canvas);
-          await page.render({ canvasContext: context, viewport }).promise;
-        }
-      }).catch((err) => {
-        host.innerHTML = '<p style="padding:16px;font-family:sans-serif;color:#dc2626">Could not render this PDF.</p>';
-        console.error(err);
-      });
-    </script>
-  </body>
-</html>`;
-}
+const previewOriginWhitelist = [...PREVIEW_ORIGIN_WHITELIST];
 
 export default function DocumentPreview({ url, fileName }: Props) {
   const { colors } = useAppTheme();
@@ -78,8 +48,20 @@ export default function DocumentPreview({ url, fileName }: Props) {
   const [loadedPdf, setLoadedPdf] = useState<{ url: string; html: string } | null>(null);
   const [loadError, setLoadError] = useState<{ url: string; message: string } | null>(null);
   const [iosLoading, setIosLoading] = useState(true);
+  const [trackedUrl, setTrackedUrl] = useState(url);
+  const [allowInlineNavigation, setAllowInlineNavigation] = useState(() =>
+    inlinePreviewNavigationGuard()
+  );
+  if (trackedUrl !== url) {
+    // A refreshed file URL stays on this screen. Reset the one allowed inline
+    // load, and show the iOS spinner before the new WebView starts.
+    setTrackedUrl(url);
+    setIosLoading(true);
+    setAllowInlineNavigation(() => inlinePreviewNavigationGuard());
+  }
   const pdfHtmlSource = loadedPdf?.url === url ? loadedPdf.html : null;
   const error = loadError?.url === url ? loadError.message : "";
+  const allowRemoteNavigation = useMemo(() => createPreviewNavigationGuard([url]), [url]);
 
   useEffect(() => {
     if (!pdf || Platform.OS === "ios") {
@@ -88,19 +70,35 @@ export default function DocumentPreview({ url, fileName }: Props) {
 
     let cancelled = false;
     const loadPdf = async () => {
+      if (!FileSystem.cacheDirectory) {
+        if (!cancelled) {
+          setLoadError({ url, message: "Could not load the original document." });
+        }
+        return;
+      }
+      // A refresh can start a second download before the first one finishes.
+      // Each download uses its own file, and that file is removed after the read.
+      const dest =
+        `${FileSystem.cacheDirectory}${PAYABLE_PREVIEW_CACHE_NAME}.` +
+        `${Date.now()}-${Math.random().toString(16).slice(2)}`;
       try {
-        const dest = `${FileSystem.cacheDirectory}${PAYABLE_PREVIEW_CACHE_NAME}`;
-        const download = await FileSystem.downloadAsync(url, dest);
+        setLoadError((current) => (current?.url === url ? null : current));
+        const [sources, download] = await Promise.all([
+          loadPdfJsSources(),
+          FileSystem.downloadAsync(url, dest),
+        ]);
         const base64 = await FileSystem.readAsStringAsync(download.uri, {
           encoding: FileSystem.EncodingType.Base64,
         });
         if (!cancelled) {
-          setLoadedPdf({ url, html: pdfHtml(base64) });
+          setLoadedPdf({ url, html: pdfHtml(base64, sources.main, sources.worker) });
         }
       } catch {
         if (!cancelled) {
           setLoadError({ url, message: "Could not load the original document." });
         }
+      } finally {
+        await FileSystem.deleteAsync(dest, { idempotent: true }).catch(() => undefined);
       }
     };
 
@@ -146,10 +144,14 @@ export default function DocumentPreview({ url, fileName }: Props) {
             <ActivityIndicator color={colors.brand} />
           </View>
         ) : null}
+        {/* WKWebView draws a PDF without JavaScript. */}
         <WebView
           key={url}
           source={{ uri: url }}
-          originWhitelist={["*"]}
+          originWhitelist={previewOriginWhitelist}
+          onShouldStartLoadWithRequest={(request) => allowRemoteNavigation(request.url)}
+          setSupportMultipleWindows={false}
+          javaScriptEnabled={false}
           startInLoadingState
           scalesPageToFit
           nestedScrollEnabled
@@ -174,8 +176,10 @@ export default function DocumentPreview({ url, fileName }: Props) {
       <View style={styles.frame}>
         {pdfHtmlSource ? (
           <WebView
-            originWhitelist={["*"]}
-            source={{ html: pdfHtmlSource, baseUrl: "https://cdnjs.cloudflare.com" }}
+            key={url}
+            originWhitelist={previewOriginWhitelist}
+            onShouldStartLoadWithRequest={(request) => allowInlineNavigation(request.url)}
+            source={{ html: pdfHtmlSource, baseUrl: INLINE_PREVIEW_BASE_URL }}
             nestedScrollEnabled
             javaScriptEnabled
             scalesPageToFit
@@ -193,9 +197,14 @@ export default function DocumentPreview({ url, fileName }: Props) {
 
   return (
     <View style={styles.frame}>
+      {/* The file is shown without running scripts. */}
       <WebView
+        key={url}
         source={{ uri: url }}
-        originWhitelist={["*"]}
+        originWhitelist={previewOriginWhitelist}
+        onShouldStartLoadWithRequest={(request) => allowRemoteNavigation(request.url)}
+        setSupportMultipleWindows={false}
+        javaScriptEnabled={false}
         startInLoadingState
         nestedScrollEnabled
         renderLoading={() => (
