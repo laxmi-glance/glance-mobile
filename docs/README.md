@@ -3,9 +3,9 @@
 | Field | Value |
 |-------|-------|
 | **Document ID** | MO-DOC-001 |
-| **Version** | 1.0 |
+| **Version** | 1.1 |
 | **Owner** | Engineering |
-| **Last updated** | 2026-09-02 |
+| **Last updated** | 2026-10-25 |
 | **Classification** | Internal |
 | **Audience** | Mobile engineers, QA |
 
@@ -20,14 +20,9 @@ Index for controlled mobile app documentation.
 | MO-DOC-010 | [../README.md](../README.md) | Product overview, auth contract, quick start |
 | MO-DOC-011 | [../HELP.md](../HELP.md) | Run, EAS build, per-env versioning, tunnel, troubleshooting |
 
-## Archive
-
-| Document | Note |
-|----------|------|
-| [archive/GETTING_STARTED.md](archive/GETTING_STARTED.md) | Merged into README (2026-09-02) |
-
 ## Revision history
 
 | Date | Version | Author | Summary |
 |------|---------|--------|---------|
+| 2026-10-25 | 1.1 | Engineering | Remove the archived getting-started note already merged into the README |
 | 2026-09-02 | 1.0 | Engineering | Initial index |
