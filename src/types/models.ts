@@ -274,3 +274,57 @@ export interface AppNotification {
   fixable?: boolean;
   resolved?: boolean;
 }
+
+/** Where a document stands in its approval, from /financial-document/<id>/approval-trail/. */
+export interface ApprovalTrailPerson {
+  id: string;
+  name: string;
+}
+
+export interface ApprovalTrailAssignment {
+  id: string;
+  approver: ApprovalTrailPerson | null;
+  status: "pending" | "approved" | "rejected" | "not_needed" | "replaced";
+  source: "policy" | "delegation" | "reassignment" | "escalation";
+  on_behalf_of?: ApprovalTrailPerson | null;
+  /** Who recorded the decision; differs from the approver only for an override. */
+  decided_by?: ApprovalTrailPerson | null;
+  decided_at?: string | null;
+  is_override?: boolean;
+  remarks?: string;
+}
+
+export interface ApprovalTrailStep {
+  id: string;
+  sequence: number;
+  name: string;
+  mode: "all" | "any";
+  status: "waiting" | "pending" | "approved" | "rejected" | "cancelled";
+  assignments: ApprovalTrailAssignment[];
+}
+
+export interface ApprovalTrailRun {
+  id: string;
+  policy_name: string;
+  status: "in_progress" | "approved" | "rejected" | "cancelled";
+  end_reason?: string;
+  steps: ApprovalTrailStep[];
+}
+
+export interface ApprovalTrail {
+  approval_status: ApprovalStatus | "";
+  governed_by_policy: boolean;
+  policy_name?: string | null;
+  /** Whether the signed-in user may approve or reject right now. */
+  can_decide: boolean;
+  /** True when deciding would be an owner or admin override of someone else's step. */
+  is_override: boolean;
+  current_step?: {
+    sequence: number;
+    total_steps: number;
+    name: string;
+    mode: "all" | "any";
+  } | null;
+  waiting_for: ApprovalTrailPerson[];
+  runs: ApprovalTrailRun[];
+}

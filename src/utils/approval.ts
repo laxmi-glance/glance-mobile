@@ -1,5 +1,7 @@
 import type {
   ApprovalStatus,
+  ApprovalTrail,
+  ApprovalTrailRun,
   FinancialDocumentDetail,
   FinancialDocumentListItem,
   RbacConfig,
@@ -127,4 +129,112 @@ export function canActOnApproval(
     return { canApprove: true, canReject: false };
   }
   return { canApprove: true, canReject: true };
+}
+
+/**
+ * Narrow or widen the role-based gate with what the server says about this document.
+ *
+ * While a document is pending, the server knows whose turn it is: an assigned approver, the
+ * approvers of the current policy step, or an owner or admin overriding. Decided documents keep
+ * the role-based gate (reversing a decision is not a step).
+ */
+export function applyApprovalTrail(
+  gate: ApprovalActionGate,
+  doc: FinancialDocumentDetail,
+  trail: ApprovalTrail | null | undefined
+): ApprovalActionGate {
+  if (!trail || doc.approval_status !== "pending" || doc.gl_posting_status === "POSTED") {
+    return gate;
+  }
+  if (trail.can_decide) {
+    return { canApprove: true, canReject: true };
+  }
+  const names = (trail.waiting_for || []).map((person) => person?.name).filter(Boolean);
+  return denied(
+    names.length
+      ? `Waiting for ${names.join(", ")}.`
+      : gate.reason || "This document is not waiting for your decision."
+  );
+}
+
+/** One line for the current state of an approval, or null when there is nothing to add. */
+export function approvalProgressLine(trail: ApprovalTrail | null | undefined): string | null {
+  if (!trail) {
+    return null;
+  }
+  const names = (trail.waiting_for || []).map((person) => person?.name).filter(Boolean);
+  if (!names.length) {
+    return null;
+  }
+  const step = trail.current_step;
+  const who =
+    names.length > 1
+      ? `${step?.mode === "any" ? "any one of" : "all of"} ${names.join(", ")}`
+      : names[0];
+  return step
+    ? `Step ${step.sequence} of ${step.total_steps}: waiting for ${who}`
+    : `Waiting for ${who}`;
+}
+
+/** One row per step of the latest approval run: who decided, or who the step is waiting for. */
+export function approvalStepRows(
+  trail: ApprovalTrail | null | undefined
+): { label: string; value: string }[] {
+  const run = currentApprovalRun(trail);
+  if (!run) {
+    return [];
+  }
+  return run.steps.map((step) => {
+    const namesWith = (status: string) =>
+      step.assignments
+        .filter((assignment) => assignment.status === status)
+        .map((assignment) => assignment.approver?.name)
+        .filter(Boolean)
+        .join(", ");
+    let value: string;
+    switch (step.status) {
+      case "approved":
+        value = `Approved by ${namesWith("approved") || "—"}`;
+        break;
+      case "rejected":
+        value = `Rejected by ${namesWith("rejected") || "—"}`;
+        break;
+      case "pending": {
+        const done = namesWith("approved");
+        const waiting = `Waiting for ${namesWith("pending") || "—"}`;
+        value = done ? `${waiting} (approved by ${done})` : waiting;
+        break;
+      }
+      case "cancelled":
+        value = "Cancelled";
+        break;
+      default:
+        value = "Not started";
+    }
+    return {
+      label: step.name ? `Step ${step.sequence}: ${step.name}` : `Step ${step.sequence}`,
+      value,
+    };
+  });
+}
+
+/**
+ * The run that explains the document's present approval status: the one in progress, or the
+ * latest finished one if it produced that status. A cancelled run, or an approved run on a
+ * document that was rejected afterwards, no longer describes the document and is left out.
+ */
+export function currentApprovalRun(
+  trail: ApprovalTrail | null | undefined
+): ApprovalTrailRun | null {
+  const run = trail?.runs?.[0];
+  if (!trail || !run) {
+    return null;
+  }
+  if (run.status === "in_progress") {
+    return run;
+  }
+  if (run.status === "approved" || run.status === "rejected") {
+    return run.status === trail.approval_status ? run : null;
+  }
+  return null;
 }

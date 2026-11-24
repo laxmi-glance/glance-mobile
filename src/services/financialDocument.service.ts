@@ -2,6 +2,7 @@ import { apiClient } from "../config/api";
 import type {
   ApListParams,
   ApprovalStatus,
+  ApprovalTrail,
   FinancialDocumentDetail,
   FinancialDocumentListItem,
   FinancialDocumentStats,
@@ -41,6 +42,21 @@ class FinancialDocumentService {
       `/financial-document/financial-document/${documentId}/`
     );
     return data;
+  }
+
+  /**
+   * Approval progress and whether this user may decide. Null when it cannot be loaded; the
+   * screen then falls back to role checks and the server still enforces every rule.
+   */
+  async getApprovalTrail(documentId: string): Promise<ApprovalTrail | null> {
+    try {
+      const { data } = await apiClient.get<ApprovalTrail>(
+        `/financial-document/financial-document/${documentId}/approval-trail/`
+      );
+      return data;
+    } catch {
+      return null;
+    }
   }
 
   async submitApproval(input: {

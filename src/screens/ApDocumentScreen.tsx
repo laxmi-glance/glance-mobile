@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { View, Text, ActivityIndicator, ScrollView, Alert } from "react-native";
 import { ApDocumentScreenProps } from "../types/navigation";
 import financialDocumentService from "../services/financialDocument.service";
-import type { FinancialDocumentDetail } from "../types/models";
+import type { ApprovalTrail, FinancialDocumentDetail } from "../types/models";
 import StatusBadge from "../components/StatusBadge";
 import Card from "../components/Card";
 import DocumentPreview from "../components/DocumentPreview";
@@ -13,9 +13,13 @@ import { formatMoney, humanizeKey } from "../utils/money";
 import { resolvePayableAmounts, type PayableAmounts } from "../utils/payableAmounts";
 import { apiErrorMessage } from "../utils/errors";
 import {
+  applyApprovalTrail,
   approvalLabel,
+  approvalProgressLine,
+  approvalStepRows,
   approvalTone,
   canActOnApproval,
+  currentApprovalRun,
   displayName,
   vendorName,
 } from "../utils/approval";
@@ -37,6 +41,7 @@ export default function ApDocumentScreen({ route, navigation }: ApDocumentScreen
   const rbac = useRbac();
   const { canViewAp, loading: rbacLoading } = rbac;
   const [document, setDocument] = useState<FinancialDocumentDetail | null>(null);
+  const [trail, setTrail] = useState<ApprovalTrail | null>(null);
   const [loading, setLoading] = useState(true);
   const [actingOn, setActingOn] = useState<"approved" | "rejected" | null>(null);
   const [rejectOpen, setRejectOpen] = useState(false);
@@ -47,11 +52,15 @@ export default function ApDocumentScreen({ route, navigation }: ApDocumentScreen
       fetchGen.current += 1;
       const gen = fetchGen.current;
       try {
-        const data = await financialDocumentService.getDocument(documentId);
+        const [data, trailData] = await Promise.all([
+          financialDocumentService.getDocument(documentId),
+          financialDocumentService.getApprovalTrail(documentId),
+        ]);
         if (gen !== fetchGen.current) {
           return;
         }
         setDocument(data);
+        setTrail(trailData);
       } catch (error: unknown) {
         if (gen !== fetchGen.current) {
           return;
@@ -95,7 +104,13 @@ export default function ApDocumentScreen({ route, navigation }: ApDocumentScreen
         remarks,
       });
       setRejectOpen(false);
-      Alert.alert(status === "approved" ? "Approved" : "Rejected", "Approval status updated.");
+      // Under an approval policy an approval may be one step of several, so the document
+      // can still be pending afterwards.
+      if (status === "approved" && (trail?.governed_by_policy || trail?.runs?.length)) {
+        Alert.alert("Approval recorded", "Your approval has been saved.");
+      } else {
+        Alert.alert(status === "approved" ? "Approved" : "Rejected", "Approval status updated.");
+      }
       await loadDocument(false);
     } catch (error: unknown) {
       Alert.alert("Could not update approval", apiErrorMessage(error));
@@ -143,7 +158,14 @@ export default function ApDocumentScreen({ route, navigation }: ApDocumentScreen
   const currency = document.invoice_currency || "INR";
   const amounts = resolvePayableAmounts(document);
   const approval = document.document_approval;
-  const actionGate = canActOnApproval(document, rbac.config, rbac.role, rbac.username);
+  const actionGate = applyApprovalTrail(
+    canActOnApproval(document, rbac.config, rbac.role, rbac.username),
+    document,
+    trail
+  );
+  const progressLine = approvalProgressLine(trail);
+  const stepRows = approvalStepRows(trail);
+  const shownRun = currentApprovalRun(trail);
   const netDiffers =
     amounts.netPayable != null && amounts.total != null && amounts.netPayable !== amounts.total;
   const heroAmount = netDiffers ? amounts.netPayable : amounts.total;
@@ -159,7 +181,8 @@ export default function ApDocumentScreen({ route, navigation }: ApDocumentScreen
     .join(" · ");
   const amountRows = amountBreakdownRows(amounts, currency, netDiffers);
   const approvalRows = [
-    { label: "Requested to", value: displayName(approval?.requested_to) },
+    // Under a policy the progress card lists everyone the step is waiting for.
+    { label: "Requested to", value: shownRun ? "" : displayName(approval?.requested_to) },
     { label: "Approved by", value: displayName(approval?.approved_by) },
     { label: "Approved at", value: formatDateTime(approval?.approved_at || document.approval_at) },
     { label: "Rejected at", value: formatDateTime(approval?.rejected_at) },
@@ -225,7 +248,9 @@ export default function ApDocumentScreen({ route, navigation }: ApDocumentScreen
               reversing ? "Approve rejected document" : "Approve document",
               reversing
                 ? "This payable was rejected. Approve it now?"
-                : "Approve this payable as per your workspace role?",
+                : trail?.is_override
+                  ? "This step is assigned to someone else. Approve it as an override?"
+                  : "Approve this payable as per your workspace role?",
               [
                 { text: "Cancel", style: "cancel" },
                 { text: "Approve", onPress: () => void submit("approved") },
@@ -275,6 +300,17 @@ export default function ApDocumentScreen({ route, navigation }: ApDocumentScreen
           </Card>
         ) : null}
 
+        {stepRows.length || progressLine ? (
+          <Card style={styles.section}>
+            <Text style={styles.sectionTitle}>Approval progress</Text>
+            {shownRun?.policy_name ? <InfoRow label="Policy" value={shownRun.policy_name} /> : null}
+            {progressLine ? <InfoRow label="Now" value={progressLine} /> : null}
+            {stepRows.map((row) => (
+              <InfoRow key={row.label} label={row.label} value={row.value} />
+            ))}
+          </Card>
+        ) : null}
+
         {approvalRows.length ? (
           <Card style={styles.section}>
             <Text style={styles.sectionTitle}>Approval</Text>
@@ -302,7 +338,9 @@ export default function ApDocumentScreen({ route, navigation }: ApDocumentScreen
           lead={
             document.approval_status === "approved"
               ? "This payable is approved. Add a reason to reject it."
-              : "A reason is required so the submitter knows what to fix."
+              : trail?.is_override
+                ? "This step is assigned to someone else. Rejecting it is recorded as an override and ends the approval."
+                : "A reason is required so the submitter knows what to fix."
           }
           onClose={() => setRejectOpen(false)}
           onSubmit={(remarks) => void submit("rejected", remarks)}

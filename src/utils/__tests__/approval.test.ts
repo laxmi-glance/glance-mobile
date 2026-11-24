@@ -1,11 +1,16 @@
 import type {
+  ApprovalTrail,
   FinancialDocumentDetail,
   FinancialDocumentListItem,
   RbacConfig,
 } from "../../types/models";
 import {
+  applyApprovalTrail,
   approvalLabel,
+  approvalProgressLine,
+  approvalStepRows,
   canActOnApproval,
+  currentApprovalRun,
   displayName,
   documentLifecycleLabel,
   isProcessingRow,
@@ -150,5 +155,197 @@ describe("canActOnApproval", () => {
     expect(
       canActOnApproval(detail({ approval_status: "rejected", total: "10" }), config, "accountant")
     ).toEqual({ canApprove: true, canReject: false });
+  });
+});
+
+describe("approval trail", () => {
+  const person = (id: string, name: string) => ({ id, name });
+  const both = { canApprove: true, canReject: true };
+
+  function trail(overrides: Partial<ApprovalTrail> = {}): ApprovalTrail {
+    return {
+      approval_status: "pending",
+      governed_by_policy: true,
+      can_decide: false,
+      is_override: false,
+      current_step: { sequence: 2, total_steps: 3, name: "", mode: "any" },
+      waiting_for: [person("u-c", "Chen"), person("u-d", "Dev")],
+      runs: [
+        {
+          id: "r-1",
+          policy_name: "Large purchases",
+          status: "in_progress",
+          steps: [
+            {
+              id: "s-1",
+              sequence: 1,
+              name: "Accounts",
+              mode: "all",
+              status: "approved",
+              assignments: [
+                {
+                  id: "a-1",
+                  approver: person("u-a", "Asha"),
+                  status: "approved",
+                  source: "policy",
+                },
+              ],
+            },
+            {
+              id: "s-2",
+              sequence: 2,
+              name: "",
+              mode: "any",
+              status: "pending",
+              assignments: [
+                { id: "a-2", approver: person("u-c", "Chen"), status: "pending", source: "policy" },
+                { id: "a-3", approver: person("u-d", "Dev"), status: "pending", source: "policy" },
+              ],
+            },
+            { id: "s-3", sequence: 3, name: "", mode: "all", status: "waiting", assignments: [] },
+          ],
+        },
+      ],
+      ...overrides,
+    };
+  }
+
+  it("blocks a pending document that is waiting for someone else, and says who", () => {
+    const gate = applyApprovalTrail(both, detail({ approval_status: "pending" }), trail());
+    expect(gate).toEqual({ canApprove: false, canReject: false, reason: "Waiting for Chen, Dev." });
+  });
+
+  it("offers the decision when the server says it is the turn of this user", () => {
+    const denied = { canApprove: false, canReject: false };
+    const gate = applyApprovalTrail(
+      denied,
+      detail({ approval_status: "pending" }),
+      trail({ can_decide: true })
+    );
+    expect(gate).toEqual(both);
+  });
+
+  it("leaves the role-based gate alone without a trail or once the document is decided", () => {
+    const gate = { canApprove: false, canReject: true };
+    expect(applyApprovalTrail(gate, detail({ approval_status: "pending" }), null)).toBe(gate);
+    expect(applyApprovalTrail(gate, detail({ approval_status: "approved" }), trail())).toBe(gate);
+    expect(
+      applyApprovalTrail(
+        gate,
+        detail({ approval_status: "pending", gl_posting_status: "POSTED" }),
+        trail()
+      )
+    ).toBe(gate);
+  });
+
+  it("describes the current step and every step of the run", () => {
+    expect(approvalProgressLine(trail())).toBe("Step 2 of 3: waiting for any one of Chen, Dev");
+    expect(
+      approvalProgressLine(trail({ current_step: null, waiting_for: [person("u-b", "Bina")] }))
+    ).toBe("Waiting for Bina");
+    expect(approvalProgressLine(trail({ waiting_for: [] }))).toBeNull();
+    expect(approvalProgressLine(null)).toBeNull();
+
+    expect(approvalStepRows(trail())).toEqual([
+      { label: "Step 1: Accounts", value: "Approved by Asha" },
+      { label: "Step 2", value: "Waiting for Chen, Dev" },
+      { label: "Step 3", value: "Not started" },
+    ]);
+    expect(approvalStepRows(trail({ runs: [] }))).toEqual([]);
+  });
+});
+
+describe("approval trail edge cases", () => {
+  const person = (id: string, name: string) => ({ id, name });
+  const base: ApprovalTrail = {
+    approval_status: "pending",
+    governed_by_policy: true,
+    can_decide: false,
+    is_override: false,
+    current_step: { sequence: 1, total_steps: 1, name: "", mode: "all" },
+    waiting_for: [],
+    runs: [],
+  };
+  const run = (status: "in_progress" | "approved" | "rejected" | "cancelled") => ({
+    id: "r-1",
+    policy_name: "Large purchases",
+    status,
+    steps: [
+      {
+        id: "s-1",
+        sequence: 1,
+        name: "",
+        mode: "all" as const,
+        status: "pending" as const,
+        assignments: [
+          {
+            id: "a-1",
+            approver: person("u-a", "Asha"),
+            status: "approved" as const,
+            source: "policy" as const,
+          },
+          {
+            id: "a-2",
+            approver: person("u-b", "Bina"),
+            status: "pending" as const,
+            source: "policy" as const,
+          },
+          {
+            id: "a-3",
+            approver: person("u-c", "Chen"),
+            status: "replaced" as const,
+            source: "policy" as const,
+          },
+        ],
+      },
+    ],
+  });
+
+  it("always gives a reason when the server says no", () => {
+    const gate = applyApprovalTrail(
+      { canApprove: true, canReject: true },
+      { id: "doc-1", created_on: "2026-04-03T00:00:00Z", approval_status: "pending" },
+      base
+    );
+    expect(gate.canApprove).toBe(false);
+    expect(gate.reason).toBe("This document is not waiting for your decision.");
+  });
+
+  it("does not let the server widen the gate for a posted document", () => {
+    const denied = { canApprove: false, canReject: false, reason: "Posted" };
+    const gate = applyApprovalTrail(
+      denied,
+      {
+        id: "doc-1",
+        created_on: "2026-04-03T00:00:00Z",
+        approval_status: "pending",
+        gl_posting_status: "POSTED",
+      },
+      { ...base, can_decide: true }
+    );
+    expect(gate).toBe(denied);
+  });
+
+  it("words an all-must step and shows who has already approved", () => {
+    const trail = {
+      ...base,
+      waiting_for: [person("u-b", "Bina"), person("u-d", "Dev")],
+      runs: [run("in_progress")],
+    };
+    expect(approvalProgressLine(trail)).toBe("Step 1 of 1: waiting for all of Bina, Dev");
+    expect(approvalStepRows(trail)).toEqual([
+      { label: "Step 1", value: "Waiting for Bina (approved by Asha)" },
+    ]);
+  });
+
+  it("only shows a finished run while it still explains the document", () => {
+    expect(currentApprovalRun({ ...base, runs: [run("cancelled")] })).toBeNull();
+    expect(
+      currentApprovalRun({ ...base, approval_status: "rejected", runs: [run("approved")] })
+    ).toBeNull();
+    expect(
+      currentApprovalRun({ ...base, approval_status: "approved", runs: [run("approved")] })?.id
+    ).toBe("r-1");
+    expect(approvalStepRows({ ...base, runs: [run("cancelled")] })).toEqual([]);
   });
 });
